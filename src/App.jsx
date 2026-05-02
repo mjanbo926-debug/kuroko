@@ -12,6 +12,7 @@ import PartTimeSixMonthReport from './components/Reports/PartTimeSixMonthReport'
 import Settings from './components/Settings/Settings';
 import ScheduleView from './components/Schedule/ScheduleView';
 import DailyReport from './components/Schedule/DailyReport';
+import MonthlyStats from './components/Stats/MonthlyStats';
 import { storage } from './utils/storage';
 
 export const AppContext = createContext(null);
@@ -75,6 +76,7 @@ export default function App() {
     'report-pt-sixmonth': <PartTimeSixMonthReport />,
     'schedule': <ScheduleView />,
     'daily-report': <DailyReport />,
+    'stats': <MonthlyStats />,
     'settings': <Settings />,
   };
 

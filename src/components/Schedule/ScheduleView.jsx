@@ -35,9 +35,8 @@ function getEffectivePatients(patients, date, overrides) {
 
   const holiday = isJapaneseHoliday(dateStr);
   const normally = patients.filter(p => {
-    if ((p.absentDates || []).includes(dateStr)) return false; // お休み予定日
     if (p.visitSchedule === 'spot') return (p.spotDates || []).some(s => (s.date || s) === dateStr);
-    if (p.type === 'fullTime' && holiday) return false; // 正社員先は祝日休み
+    if (p.type === 'fullTime' && holiday) return false;
     return (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel);
   });
   const afterRemoval = normally.filter(p => !(ov.removed || []).includes(p.id));
@@ -47,6 +46,7 @@ function getEffectivePatients(patients, date, overrides) {
     .filter(p => !afterRemoval.find(n => n.id === p.id));
 
   const getTime = (p) => {
+    if (ov.timeOverrides?.[p.id]) return ov.timeOverrides[p.id];
     if (p.visitSchedule === 'spot') {
       const entry = (p.spotDates || []).find(s => (s.date || s) === dateStr);
       return entry?.time || '99:99';
@@ -109,7 +109,21 @@ export default function ScheduleView() {
 
   const hasOverride = (dateStr) => {
     const ov = scheduleOverrides[dateStr];
-    return ov && ((ov.added?.length ?? 0) + (ov.removed?.length ?? 0)) > 0;
+    return ov && ((ov.added?.length ?? 0) + (ov.removed?.length ?? 0) + Object.keys(ov.timeOverrides || {}).length) > 0;
+  };
+
+  const setTimeOverride = (dateStr, patientId, time) => {
+    const ov = { ...(scheduleOverrides[dateStr] || {}) };
+    const timeOverrides = { ...(ov.timeOverrides || {}) };
+    if (time) timeOverrides[patientId] = time;
+    else delete timeOverrides[patientId];
+    if (Object.keys(timeOverrides).length > 0) ov.timeOverrides = timeOverrides;
+    else delete ov.timeOverrides;
+    const isEmpty = !(ov.added?.length) && !(ov.removed?.length) && !Object.keys(ov.timeOverrides || {}).length;
+    const newOverrides = { ...scheduleOverrides };
+    if (isEmpty) delete newOverrides[dateStr];
+    else newOverrides[dateStr] = ov;
+    saveScheduleOverrides(newOverrides);
   };
 
   const monthLabel = (() => {
@@ -201,17 +215,23 @@ export default function ScheduleView() {
                       ) : (
                         dayPatients.map(p => {
                           const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
-                          const time = p.visitTimes?.[dayLabel] || p.visitTime || '';
+                          const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
+                          const time = timeOverride || (p.visitSchedule === 'spot'
+                            ? (p.spotDates || []).find(s => (s.date || s) === dateStr)?.time || ''
+                            : p.visitTimes?.[dayLabel] || p.visitTime || '');
                           return (
                             <button key={p.id} onClick={() => navigate('patient-detail', { patient: p })}
                               className={`w-full text-left px-2 py-1.5 rounded-lg transition-colors ${
                                 p.status ? 'bg-gray-100 opacity-60' : isToday ? 'bg-blue-100 hover:bg-blue-200' : 'bg-white border border-gray-100 hover:bg-blue-50'}`}>
                               <div className="text-xs font-semibold text-gray-800 truncate">{p.name}</div>
-                              {time && <div className="text-xs text-gray-400">{time}</div>}
+                              {time && <div className={`text-xs ${timeOverride ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>{time}{timeOverride ? '★' : ''}</div>}
                               {p.status && (
-                                <div className={`text-xs font-medium ${p.status === 'hospitalized' ? 'text-red-500' : 'text-yellow-600'}`}>
-                                  {p.status === 'rest' ? '休み' : p.status === 'hospitalized' ? '入院中' : p.statusNote || 'その他'}
+                                <div className={`text-xs font-medium ${p.status === 'hospitalized' ? 'text-red-500' : 'text-gray-500'}`}>
+                                  {p.status === 'hospitalized' ? '入院中' : p.statusNote || 'その他'}
                                 </div>
+                              )}
+                              {!p.status && (p.absentDates || []).includes(dateStr) && (
+                                <div className="text-xs font-medium text-orange-500">お休み</div>
                               )}
                             </button>
                           );
@@ -354,8 +374,10 @@ export default function ScheduleView() {
                     {dayPatients.map(p => {
                       const visitRecord = dailyReport?.visits?.find(v => v.patientId === p.id);
                       const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
+                      const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
                       return (
                         <PatientChip key={p.id} patient={p} visitRecord={visitRecord} dayLabel={dayLabel} dateStr={dateStr}
+                          timeOverride={timeOverride}
                           onClick={() => navigate('patient-detail', { patient: p })} />
                       );
                     })}
@@ -380,13 +402,23 @@ export default function ScheduleView() {
                         const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                         const normallyScheduled = (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel);
                         const isAdded = !normallyScheduled;
+                        const ov = scheduleOverrides[dateStr] || {};
+                        const timeOverride = ov.timeOverrides?.[p.id] || '';
+                        const defaultTime = p.visitSchedule === 'spot'
+                          ? (p.spotDates || []).find(s => (s.date || s) === dateStr)?.time || ''
+                          : p.visitTimes?.[dayLabel] || p.visitTime || '';
                         return (
-                          <div key={p.id} className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-xl">
+                          <div key={p.id} className="flex items-center gap-2 p-3 bg-green-50 border border-green-100 rounded-xl">
                             <div className="flex-1 min-w-0">
                               <span className="text-sm font-medium text-gray-800">{p.name}</span>
-                              {p.visitTime && <span className="text-xs text-gray-400 ml-2">{p.visitTime}</span>}
                               {isAdded && <span className="text-xs text-blue-600 ml-2 font-medium">+この日のみ追加</span>}
                             </div>
+                            <input
+                              type="time"
+                              value={timeOverride || defaultTime}
+                              onChange={e => setTimeOverride(dateStr, p.id, e.target.value)}
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 shrink-0"
+                            />
                             <button
                               onClick={() => togglePatientForDate(dateStr, p.id, true)}
                               className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors shrink-0">
@@ -464,23 +496,23 @@ export default function ScheduleView() {
 }
 
 const STATUS_BADGE = {
-  rest: { label: '休み', cls: 'bg-yellow-100 text-yellow-700' },
   hospitalized: { label: '入院中', cls: 'bg-red-100 text-red-700' },
   other: { label: 'その他', cls: 'bg-gray-200 text-gray-600' },
 };
 
-function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr }) {
+function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr, timeOverride }) {
   const statusInfo = patient.status ? STATUS_BADGE[patient.status] : null;
   const hasStatus = !!patient.status;
+  const isAbsentToday = dateStr ? (patient.absentDates || []).includes(dateStr) : false;
   const spotEntry = patient.visitSchedule === 'spot' && dateStr
     ? (patient.spotDates || []).find(s => (s.date || s) === dateStr)
     : null;
-  const time = spotEntry?.time || (dayLabel && patient.visitTimes?.[dayLabel]) || patient.visitTime || '';
+  const time = timeOverride || spotEntry?.time || (dayLabel && patient.visitTimes?.[dayLabel]) || patient.visitTime || '';
 
   return (
     <button onClick={onClick}
       className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-        hasStatus
+        hasStatus || isAbsentToday
           ? 'bg-gray-100 border border-gray-200 opacity-70 hover:opacity-90'
           : dark
             ? 'bg-blue-500 hover:bg-blue-400 text-white'
@@ -498,7 +530,10 @@ function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr })
               {statusInfo.label}{patient.statusNote ? `：${patient.statusNote}` : ''}
             </span>
           )}
-          {visitRecord && !dark && !hasStatus && (
+          {isAbsentToday && !hasStatus && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-600">お休み</span>
+          )}
+          {visitRecord && !dark && !hasStatus && !isAbsentToday && (
             <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
               visitRecord.visited ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
               {visitRecord.visited ? '訪問済み' : '未訪問'}
@@ -506,7 +541,7 @@ function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr })
           )}
         </div>
         <div className={`flex items-center gap-3 text-xs mt-0.5 ${dark && !hasStatus ? 'text-blue-100' : 'text-gray-500'}`}>
-          {time && <span className="flex items-center gap-1"><Clock size={11} />{time}</span>}
+          {time && <span className={`flex items-center gap-1 ${timeOverride ? 'text-orange-500 font-medium' : ''}`}><Clock size={11} />{time}{timeOverride ? '★' : ''}</span>}
           {patient.address && <span className="flex items-center gap-1 truncate"><MapPin size={11} /><span className="truncate">{patient.address}</span></span>}
         </div>
       </div>

@@ -185,39 +185,20 @@ export default function DailyReport() {
                 {/* 展開：記録フォーム */}
                 {isExpanded && (
                   <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
-                    {visit.visited ? (
-                      <>
-                        <Field label="体調・生活状況">
-                          <textarea
-                            value={visit.condition}
-                            onChange={e => setVisit(visit.patientId, 'condition', e.target.value)}
-                            className={ta()} rows={2}
-                            placeholder="本日の体調・生活状況を記入..." />
-                        </Field>
-                        <Field label="施術内容・メモ">
-                          <textarea
-                            value={visit.notes}
-                            onChange={e => setVisit(visit.patientId, 'notes', e.target.value)}
-                            className={ta()} rows={3}
-                            placeholder="実施した施術内容、所見などを記入..." />
-                        </Field>
-                        <Field label="施術中・後の反応">
-                          <textarea
-                            value={visit.reaction}
-                            onChange={e => setVisit(visit.patientId, 'reaction', e.target.value)}
-                            className={ta()} rows={2}
-                            placeholder="施術中・後の反応を記入..." />
-                        </Field>
-                      </>
-                    ) : (
-                      <Field label="未訪問の理由">
-                        <textarea
-                          value={visit.absent}
-                          onChange={e => setVisit(visit.patientId, 'absent', e.target.value)}
-                          className={ta()} rows={2}
-                          placeholder="キャンセル理由・不在など..." />
-                      </Field>
-                    )}
+                    <Field label="体調・生活状況">
+                      <textarea
+                        value={visit.condition}
+                        onChange={e => setVisit(visit.patientId, 'condition', e.target.value)}
+                        className={ta()} rows={2}
+                        placeholder="本日の体調・生活状況を記入..." />
+                    </Field>
+                    <Field label="施術内容・メモ">
+                      <textarea
+                        value={visit.notes}
+                        onChange={e => setVisit(visit.patientId, 'notes', e.target.value)}
+                        className={ta()} rows={3}
+                        placeholder="実施した施術内容、所見などを記入..." />
+                    </Field>
 
                     {/* 患者詳細へのリンク */}
                     <button

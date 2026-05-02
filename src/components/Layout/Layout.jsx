@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { Settings, Menu, X, ChevronLeft, Home, CalendarDays, Users } from 'lucide-react';
+import { Settings, Menu, X, ChevronLeft, CalendarDays, Users, BarChart2 } from 'lucide-react';
 
 export default function Layout({ children }) {
   const { currentView, navigate, selectedPatient } = useApp();
@@ -46,6 +46,7 @@ export default function Layout({ children }) {
             <div className="hidden md:flex items-center gap-2">
               <HeaderBtn label="患者一覧" onClick={() => navigate('patients')} active={currentView === 'patients'} />
               <HeaderBtn label="スケジュール" onClick={() => navigate('schedule')} active={currentView === 'schedule'} />
+              <HeaderBtn label="集計" onClick={() => navigate('stats')} active={currentView === 'stats'} />
               <HeaderBtn label="設定" onClick={() => navigate('settings')} active={currentView === 'settings'} />
             </div>
           )}
@@ -67,6 +68,9 @@ export default function Layout({ children }) {
               <MenuItem icon={<CalendarDays size={20} />} label="スケジュール"
                 onClick={() => { navigate('schedule'); setMenuOpen(false); }}
                 active={currentView === 'schedule'} />
+              <MenuItem icon={<BarChart2 size={20} />} label="集計"
+                onClick={() => { navigate('stats'); setMenuOpen(false); }}
+                active={currentView === 'stats'} />
               <MenuItem icon={<Settings size={20} />} label="設定"
                 onClick={() => { navigate('settings'); setMenuOpen(false); }}
                 active={currentView === 'settings'} />
@@ -83,7 +87,8 @@ export default function Layout({ children }) {
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-30">
           <div className="flex">
             <BottomTab icon={<Users size={22} />} label="患者" onClick={() => navigate('patients')} active={currentView === 'patients'} />
-            <BottomTab icon={<CalendarDays size={22} />} label="スケジュール" onClick={() => navigate('schedule')} active={currentView === 'schedule'} />
+            <BottomTab icon={<CalendarDays size={22} />} label="予定" onClick={() => navigate('schedule')} active={currentView === 'schedule'} />
+            <BottomTab icon={<BarChart2 size={22} />} label="集計" onClick={() => navigate('stats')} active={currentView === 'stats'} />
             <BottomTab icon={<Settings size={22} />} label="設定" onClick={() => navigate('settings')} active={currentView === 'settings'} />
           </div>
         </nav>

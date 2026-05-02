@@ -9,7 +9,6 @@ const ADL_LABELS = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'rest', label: '休み', color: 'yellow' },
   { value: 'hospitalized', label: '入院中', color: 'red' },
   { value: 'other', label: 'その他', color: 'gray' },
 ];
