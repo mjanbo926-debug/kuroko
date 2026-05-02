@@ -1,0 +1,245 @@
+import React, { useState } from 'react';
+import { useApp } from '../../App';
+import { correctText, summarizePatientDailyReports } from '../../utils/anthropic';
+import { generatePartTimeSixMonthExcel } from '../../utils/excel';
+import { generateId } from '../../utils/helpers';
+import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check } from 'lucide-react';
+
+const REPORT_FIELDS = [
+  ['initialStatus', '施術開始時の状況', '施術開始時の身体・生活状況を記入...', 3],
+  ['longTermGoal', '長期目標', '長期的な施術目標を記入...', 2],
+  ['shortTermGoal', '短期目標', '短期的な施術目標を記入...', 2],
+  ['treatmentContent', '施術内容', '半年間の施術内容を記入...', 3],
+  ['mentalCare', '声かけ・メンタルケア', '声かけやメンタルケアの内容を記入...', 2],
+  ['currentStatus', '現状', '現在の身体・生活状況を記入...', 3],
+  ['futureApproach', '今後の取り組み', '今後の施術方針・取り組みを記入...', 2],
+  ['specialNotes', '特記事項', '特記事項があれば記入...', 2],
+];
+
+export default function PartTimeSixMonthReport() {
+  const { selectedPatient, reports, saveReports, patientDailyReports, settings } = useApp();
+  const p = selectedPatient;
+
+  const [form, setForm] = useState({
+    karteNo: '', recordDate: new Date().toISOString().split('T')[0],
+    treatmentCount: '',
+    initialStatus: '', longTermGoal: '', shortTermGoal: '',
+    treatmentContent: '', mentalCare: '',
+    currentStatus: '', futureApproach: '', specialNotes: '',
+  });
+  const [corrected, setCorrected] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [dailyOpen, setDailyOpen] = useState(false);
+
+  const set = (key, val) => { setForm(f => ({ ...f, [key]: val })); setSaved(false); };
+
+  // この患者の日報を日付の新しい順に取得
+  const allDailyReports = (patientDailyReports || [])
+    .filter(r => r.patientId === p.id)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  // recordDate から6ヶ月前を計算
+  const sixMonthsAgo = (() => {
+    const d = new Date(form.recordDate);
+    d.setMonth(d.getMonth() - 6);
+    return d.toISOString().split('T')[0];
+  })();
+
+  const periodReports = allDailyReports.filter(r => r.date >= sixMonthsAgo && r.date <= form.recordDate);
+
+  const handleSummarize = async () => {
+    setError('');
+    if (periodReports.length === 0) {
+      setError('対象期間内に日報が見つかりません。日報を記入してから実行してください。');
+      return;
+    }
+    setSummarizing(true);
+    try {
+      const result = await summarizePatientDailyReports(p.name, periodReports, settings.apiKey);
+      setForm(f => ({
+        ...f,
+        initialStatus: result.initialStatus || f.initialStatus,
+        treatmentContent: result.treatmentContent || f.treatmentContent,
+        mentalCare: result.mentalCare || f.mentalCare,
+        currentStatus: result.currentStatus || f.currentStatus,
+        futureApproach: result.futureApproach || f.futureApproach,
+        specialNotes: result.specialNotes || f.specialNotes,
+      }));
+      setForm(f => ({ ...f, treatmentCount: f.treatmentCount || String(periodReports.length) }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
+  const handleCorrect = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const days = Array.isArray(p.visitDays) ? p.visitDays.join('・') : (p.visitDays || '');
+      const raw = `【施術報告書】${p.name}様\n施術開始日：${p.startDate || ''}　施術曜日：${days}　施術回数：${form.treatmentCount}回\n傷病名：${p.diagnosis || ''}\n\n■ 施術開始時の状況\n${form.initialStatus}\n\n■ 長期目標\n${form.longTermGoal}\n\n■ 短期目標\n${form.shortTermGoal}\n\n■ 施術内容\n${form.treatmentContent}\n\n■ 声かけ・メンタルケア\n${form.mentalCare}\n\n■ 現状\n${form.currentStatus}\n\n■ 今後の取り組み\n${form.futureApproach}\n\n■ 特記事項\n${form.specialNotes}`;
+      const result = await correctText(raw, settings.apiKey);
+      setCorrected(result);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExport = () => {
+    generatePartTimeSixMonthExcel(p, form, corrected);
+  };
+
+  const handleSave = () => {
+    const report = {
+      id: generateId(), patientId: p.id, type: 'pt-sixmonth',
+      form, correctedText: corrected, createdAt: new Date().toISOString(),
+    };
+    saveReports([...reports, report]);
+    setSaved(true);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-gray-800">施術報告書</h2>
+        <p className="text-sm text-gray-500 mt-0.5">副業先・半年毎 — Excel出力</p>
+      </div>
+
+      {/* 基本情報 */}
+      <Card title="基本情報">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="カルテNo">
+            <input value={form.karteNo} onChange={e => set('karteNo', e.target.value)} className={inp()} placeholder="例：001" />
+          </Field>
+          <Field label="記録日">
+            <input type="date" value={form.recordDate} onChange={e => set('recordDate', e.target.value)} className={inp()} />
+          </Field>
+        </div>
+        <Field label="施術回数">
+          <input type="number" value={form.treatmentCount} onChange={e => set('treatmentCount', e.target.value)}
+            className={inp()} placeholder="例：24" />
+        </Field>
+        <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-700 space-y-1">
+          <p><b>患者名：</b>{p.name}　<b>住所：</b>{p.address}</p>
+          <p><b>施術開始日：</b>{p.startDate}　<b>訪問曜日：</b>{Array.isArray(p.visitDays) ? p.visitDays.join('・') : p.visitDays}曜日</p>
+          <p><b>傷病名：</b>{p.diagnosis}</p>
+        </div>
+      </Card>
+
+      {/* 日報からまとめる */}
+      <div className={`rounded-2xl border-2 p-4 ${
+        periodReports.length > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div className="flex items-center gap-2 font-semibold text-gray-800">
+              <NotebookText size={18} className={periodReports.length > 0 ? 'text-emerald-600' : 'text-gray-400'} />
+              日報からまとめる
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              記録日から6ヶ月間（{sixMonthsAgo} 〜 {form.recordDate}）
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <div className={`text-2xl font-bold ${periodReports.length > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
+              {periodReports.length}
+            </div>
+            <div className="text-xs text-gray-400">件の日報</div>
+          </div>
+        </div>
+
+        {allDailyReports.length > 0 && (
+          <div className="mb-3">
+            <button onClick={() => setDailyOpen(!dailyOpen)}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+              対象の日報を確認
+              {dailyOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {dailyOpen && (
+              <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+                {periodReports.map(r => (
+                  <div key={r.id} className="flex items-start gap-2 bg-white rounded-lg p-2 text-xs">
+                    <span className="font-medium text-gray-700 shrink-0">{r.date.replace(/-/g, '/')}</span>
+                    <span className="text-gray-500 truncate">{r.treatment || r.condition || '（記録あり）'}</span>
+                  </div>
+                ))}
+                {periodReports.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-2">対象期間内の日報がありません</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={handleSummarize}
+          disabled={summarizing || periodReports.length === 0}
+          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
+            periodReports.length > 0
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+          {summarizing ? <><Loader2 size={18} className="animate-spin" />AIがまとめ中...</> : <><Sparkles size={18} />日報からAIで自動入力</>}
+        </button>
+
+        {periodReports.length === 0 && (
+          <p className="text-xs text-center text-gray-400 mt-2">
+            対象期間内に日報がありません。患者詳細から日報を記入してください。
+          </p>
+        )}
+      </div>
+
+      {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{error}</div>}
+
+      {/* 報告内容フォーム */}
+      <Card title="報告内容">
+        {REPORT_FIELDS.map(([key, label, placeholder, rows]) => (
+          <Field key={key} label={label}>
+            <textarea value={form[key]} onChange={e => set(key, e.target.value)}
+              className={ta()} rows={rows} placeholder={placeholder} />
+          </Field>
+        ))}
+      </Card>
+
+      {/* AI添削 */}
+      <button onClick={handleCorrect} disabled={loading}
+        className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white py-3.5 rounded-xl font-semibold hover:bg-purple-700 transition-colors disabled:opacity-60">
+        {loading ? <><Loader2 size={20} className="animate-spin" />AI添削中...</> : <><Sparkles size={20} />AIで添削する（任意）</>}
+      </button>
+
+      {corrected && (
+        <Card title="AI添削後の報告文">
+          <pre className="whitespace-pre-wrap text-sm text-gray-800 bg-gray-50 rounded-xl p-4 leading-relaxed max-h-80 overflow-y-auto">{corrected}</pre>
+          <p className="text-xs text-gray-400 mt-1">※ Excel出力時にこの添削文も含まれます</p>
+        </Card>
+      )}
+
+      <div className="flex gap-3 flex-wrap">
+        <button onClick={handleExport}
+          className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
+          <FileDown size={20} />Excelで出力
+        </button>
+        <button onClick={handleSave}
+          className={`px-5 py-3.5 rounded-xl font-semibold transition-colors flex items-center gap-2 ${
+            saved ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+          {saved ? <><Check size={18} />保存済み</> : <><Save size={18} />履歴に保存</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const Card = ({ title, children }) => (
+  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+    <h3 className="font-semibold text-gray-700 text-sm border-b pb-2">{title}</h3>
+    {children}
+  </div>
+);
+const Field = ({ label, children }) => (
+  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>{children}</div>
+);
+const inp = () => 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400';
+const ta = () => 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none';

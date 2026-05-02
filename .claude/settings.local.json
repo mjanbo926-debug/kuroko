@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(pkill -f \"vite\")",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__switch_browser",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__computer",
+      "Bash(npx vite *)",
+      "Bash(~/.nvm/versions/node/v24.0.0/bin/npx vite *)",
+      "Bash(~/.nvm/versions/node/v24.15.0/bin/npx vite *)",
+      "mcp__Claude_in_Chrome__find",
+      "Bash(sort -t_ -k3 -r)",
+      "mcp__Claude_in_Chrome__file_upload",
+      "mcp__Claude_in_Chrome__javascript_tool"
+    ]
+  }
+}
