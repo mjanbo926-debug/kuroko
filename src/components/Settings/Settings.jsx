@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../App';
 import { authStorage, storage } from '../../utils/storage';
-import { Key, Lock, Eye, EyeOff, Check, AlertCircle, Download, Upload, Smartphone } from 'lucide-react';
+import { Key, Lock, Eye, EyeOff, Check, AlertCircle, Download, Upload, Smartphone, DatabaseBackup, Shield } from 'lucide-react';
 
 const DATA_KEYS = ['patients', 'reports', 'dailyReports', 'patientDailyReports', 'scheduleOverrides'];
 
@@ -88,13 +88,45 @@ export default function Settings() {
   };
 
   const patientCount = (storage.get('patients', [])).length;
-  const exportedAt = storage.get('patients', []).length > 0
-    ? `患者${patientCount}名のデータあり`
-    : 'データなし';
+  const reportCount = (storage.get('reports', [])).length;
+  const dailyCount = (storage.get('dailyReports', [])).length;
+  const exportedAt = patientCount > 0 ? `患者${patientCount}名のデータあり` : 'データなし';
+
+  const handleBackup = () => {
+    const data = {};
+    DATA_KEYS.forEach(key => { data[key] = storage.get(key, key.endsWith('s') ? [] : {}); });
+    data._exportedAt = new Date().toISOString();
+    data._version = 1;
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const d = new Date();
+    a.download = `kuroko_backup_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-5">
       <h2 className="text-xl font-bold text-gray-800">設定</h2>
+
+      {/* バックアップ */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+        <div className="flex items-center gap-2 font-semibold text-gray-700">
+          <Shield size={18} className="text-emerald-600" />データバックアップ
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600 space-y-1">
+          <p>患者 <span className="font-bold text-gray-800">{patientCount}名</span>
+             報告書 <span className="font-bold text-gray-800">{reportCount}件</span>
+             日報 <span className="font-bold text-gray-800">{dailyCount}件</span></p>
+          <p className="text-xs text-gray-400">定期的にバックアップを保存することをおすすめします</p>
+        </div>
+        <button onClick={handleBackup}
+          className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
+          <Download size={18} />今すぐバックアップ
+        </button>
+      </div>
 
       {/* データ移行 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">

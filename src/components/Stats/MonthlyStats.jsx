@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+
+const VISIT_LIMIT = 16;
 
 function getMonthDates(year, month) {
   const dates = [];
@@ -49,12 +51,30 @@ export default function MonthlyStats() {
   const totalFT = fullTimePatients.reduce((s, p) => s + (visitCountMap[p.id] || 0), 0);
   const totalPT = partTimePatients.reduce((s, p) => s + (visitCountMap[p.id] || 0), 0);
 
+  // 16回以上の患者
+  const overLimitPatients = patients.filter(p => (visitCountMap[p.id] || 0) >= VISIT_LIMIT);
+
   return (
     <div className="space-y-4">
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-800">月次集計</h2>
       </div>
+
+      {/* 16回以上アラート */}
+      {overLimitPatients.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2 text-orange-700 font-semibold text-sm">
+            <AlertTriangle size={18} />16回以上の患者がいます
+          </div>
+          {overLimitPatients.map(p => (
+            <div key={p.id} className="flex items-center justify-between bg-white rounded-xl px-3 py-2 border border-orange-100">
+              <span className="text-sm font-medium text-gray-800">{p.name}</span>
+              <span className="text-sm font-bold text-orange-600">{visitCountMap[p.id]}回</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 月ナビゲーション */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3">
@@ -124,14 +144,22 @@ function Section({ title, color, patients, visitCountMap }) {
         {sorted.map(p => {
           const count = visitCountMap[p.id] || 0;
           const pct = Math.round((count / max) * 100);
+          const isOver = count >= VISIT_LIMIT;
           return (
-            <div key={p.id} className="px-4 py-3">
+            <div key={p.id} className={`px-4 py-3 ${isOver ? 'bg-orange-50/50' : ''}`}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm font-medium text-gray-800">{p.name}</span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.badge}`}>{count}回</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-800">{p.name}</span>
+                  {isOver && <AlertTriangle size={14} className="text-orange-500" />}
+                </div>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  isOver ? 'bg-orange-100 text-orange-700' : c.badge}`}>
+                  {count}回{isOver ? '！' : ''}
+                </span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-1.5">
-                <div className={`${c.bar} h-1.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                <div className={`${isOver ? 'bg-orange-400' : c.bar} h-1.5 rounded-full transition-all`}
+                  style={{ width: `${pct}%` }} />
               </div>
             </div>
           );
