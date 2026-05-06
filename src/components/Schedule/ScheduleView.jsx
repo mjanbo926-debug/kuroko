@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { ChevronLeft, ChevronRight, Clock, MapPin, NotebookPen, CheckCircle2, Pencil, X, Plus, Minus, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, MapPin, NotebookPen, CheckCircle2, Pencil, X, Plus, Minus, Calendar, Ban } from 'lucide-react';
 import { isJapaneseHoliday } from '../../utils/helpers';
 
 const DAYS = ['月', '火', '水', '木', '金', '土', '日'];
@@ -62,6 +62,7 @@ export default function ScheduleView() {
   const [filter, setFilter] = useState('all');
   const [editingDate, setEditingDate] = useState(null);
   const [viewMode, setViewMode] = useState('week'); // 'week' | 'list'
+  const [absenceTarget, setAbsenceTarget] = useState(null); // { patientId, dateStr }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -109,7 +110,30 @@ export default function ScheduleView() {
 
   const hasOverride = (dateStr) => {
     const ov = scheduleOverrides[dateStr];
-    return ov && ((ov.added?.length ?? 0) + (ov.removed?.length ?? 0) + Object.keys(ov.timeOverrides || {}).length) > 0;
+    return ov && (
+      (ov.added?.length ?? 0) +
+      (ov.removed?.length ?? 0) +
+      Object.keys(ov.timeOverrides || {}).length +
+      Object.keys(ov.absences || {}).length
+    ) > 0;
+  };
+
+  const setAbsence = (dateStr, patientId, reason) => {
+    const ov = { ...(scheduleOverrides[dateStr] || {}) };
+    if (reason) {
+      ov.absences = { ...(ov.absences || {}), [patientId]: reason };
+    } else {
+      const absences = { ...(ov.absences || {}) };
+      delete absences[patientId];
+      if (Object.keys(absences).length > 0) ov.absences = absences;
+      else delete ov.absences;
+    }
+    const isEmpty = !(ov.added?.length) && !(ov.removed?.length) &&
+      !Object.keys(ov.timeOverrides || {}).length && !Object.keys(ov.absences || {}).length;
+    const newOverrides = { ...scheduleOverrides };
+    if (isEmpty) delete newOverrides[dateStr];
+    else newOverrides[dateStr] = ov;
+    saveScheduleOverrides(newOverrides);
   };
 
   const setTimeOverride = (dateStr, patientId, time) => {
@@ -375,10 +399,48 @@ export default function ScheduleView() {
                       const visitRecord = dailyReport?.visits?.find(v => v.patientId === p.id);
                       const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                       const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
+                      const absenceReason = (scheduleOverrides[dateStr] || {}).absences?.[p.id];
+                      const isAbsenceTarget = absenceTarget?.patientId === p.id && absenceTarget?.dateStr === dateStr;
                       return (
-                        <PatientChip key={p.id} patient={p} visitRecord={visitRecord} dayLabel={dayLabel} dateStr={dateStr}
-                          timeOverride={timeOverride}
-                          onClick={() => navigate('patient-detail', { patient: p })} />
+                        <div key={p.id} className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <PatientChip patient={p} visitRecord={visitRecord} dayLabel={dayLabel} dateStr={dateStr}
+                                timeOverride={timeOverride} absenceReason={absenceReason}
+                                onClick={() => navigate('patient-detail', { patient: p })} />
+                            </div>
+                            <button
+                              onClick={() => setAbsenceTarget(isAbsenceTarget ? null : { patientId: p.id, dateStr })}
+                              className={`shrink-0 flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
+                                absenceReason
+                                  ? 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+                                  : isAbsenceTarget
+                                    ? 'bg-orange-400 text-white'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-500'}`}>
+                              <Ban size={12} />{absenceReason ? '休み' : 'お休み'}
+                            </button>
+                          </div>
+                          {isAbsenceTarget && (
+                            <div className="flex gap-2 flex-wrap ml-1">
+                              {['体調不良', '通院', 'その他'].map(reason => (
+                                <button key={reason}
+                                  onClick={() => { setAbsence(dateStr, p.id, reason); setAbsenceTarget(null); }}
+                                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                                    absenceReason === reason
+                                      ? 'bg-orange-500 text-white'
+                                      : 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200'}`}>
+                                  {reason}
+                                </button>
+                              ))}
+                              {absenceReason && (
+                                <button onClick={() => { setAbsence(dateStr, p.id, null); setAbsenceTarget(null); }}
+                                  className="text-xs px-3 py-1.5 rounded-lg font-medium bg-gray-100 text-gray-500 hover:bg-gray-200">
+                                  解除
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -500,10 +562,10 @@ const STATUS_BADGE = {
   other: { label: 'その他', cls: 'bg-gray-200 text-gray-600' },
 };
 
-function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr, timeOverride }) {
+function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr, timeOverride, absenceReason }) {
   const statusInfo = patient.status ? STATUS_BADGE[patient.status] : null;
   const hasStatus = !!patient.status;
-  const isAbsentToday = dateStr ? (patient.absentDates || []).includes(dateStr) : false;
+  const isAbsentToday = !!absenceReason || (dateStr ? (patient.absentDates || []).includes(dateStr) : false);
   const spotEntry = patient.visitSchedule === 'spot' && dateStr
     ? (patient.spotDates || []).find(s => (s.date || s) === dateStr)
     : null;
@@ -530,7 +592,12 @@ function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr, t
               {statusInfo.label}{patient.statusNote ? `：${patient.statusNote}` : ''}
             </span>
           )}
-          {isAbsentToday && !hasStatus && (
+          {absenceReason && !hasStatus && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-600">
+              お休み（{absenceReason}）
+            </span>
+          )}
+          {!absenceReason && isAbsentToday && !hasStatus && (
             <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-600">お休み</span>
           )}
           {visitRecord && !dark && !hasStatus && !isAbsentToday && (
