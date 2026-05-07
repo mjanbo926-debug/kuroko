@@ -7,6 +7,7 @@ const DAYS = ['月', '火', '水', '木', '金', '土', '日'];
 const JS_DAY_TO_IDX = [6, 0, 1, 2, 3, 4, 5];
 
 const BODY_PARTS = ['腰部', '頸部', '下肢', '肩部', '上肢', '背部', '腹部'];
+const TREATMENT_TAGS = ['マッサージ', 'ストレッチ', '関節可動域訓練', '運動療法', '歩行訓練', 'ローラー鍼'];
 const CONDITION_OPTIONS = ['改善傾向', '変化なし', 'やや悪化', '悪化', '好調'];
 
 function getDayLabel(dateStr) {
@@ -50,6 +51,7 @@ export default function DailyReport() {
         patientId: p.id,
         visited: saved?.visited ?? true,
         bodyParts: saved?.bodyParts ?? [],
+        treatmentTags: saved?.treatmentTags ?? [],
         patientCondition: saved?.patientCondition ?? '',
         condition: saved?.condition ?? '',
         notes: saved?.notes ?? '',
@@ -78,6 +80,16 @@ export default function DailyReport() {
       const parts = v.bodyParts || [];
       const next = parts.includes(part) ? parts.filter(p => p !== part) : [...parts, part];
       return { ...v, bodyParts: next };
+    }));
+    setSaved(false);
+  };
+
+  const toggleTreatmentTag = (patientId, tag) => {
+    setVisits(vs => vs.map(v => {
+      if (v.patientId !== patientId) return v;
+      const tags = v.treatmentTags || [];
+      const next = tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag];
+      return { ...v, treatmentTags: next };
     }));
     setSaved(false);
   };
@@ -154,7 +166,7 @@ export default function DailyReport() {
             const patient = patients.find(p => p.id === visit.patientId);
             if (!patient) return null;
             const isExpanded = expanded[visit.patientId];
-            const hasRecord = (visit.bodyParts?.length > 0) || visit.patientCondition || visit.notes || visit.condition;
+            const hasRecord = (visit.bodyParts?.length > 0) || (visit.treatmentTags?.length > 0) || visit.patientCondition || visit.notes || visit.condition;
 
             return (
               <div key={visit.patientId}
@@ -250,10 +262,29 @@ export default function DailyReport() {
                         onChange={e => setVisit(visit.patientId, 'condition', e.target.value)}
                         className={ta()} rows={2} placeholder="本日の体調・生活状況を記入..." />
                     </Field>
-                    <Field label="施術内容・メモ">
+                    {/* 施術内容タグ */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">施術内容</p>
+                      <div className="flex flex-wrap gap-2">
+                        {TREATMENT_TAGS.map(tag => {
+                          const selected = (visit.treatmentTags || []).includes(tag);
+                          return (
+                            <button key={tag} onClick={() => toggleTreatmentTag(visit.patientId, tag)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                                selected
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'}`}>
+                              {tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <Field label="施術メモ">
                       <textarea value={visit.notes}
                         onChange={e => setVisit(visit.patientId, 'notes', e.target.value)}
-                        className={ta()} rows={3} placeholder="実施した施術内容、所見などを記入..." />
+                        className={ta()} rows={2} placeholder="補足・所見などを記入..." />
                     </Field>
                     <Field label="ADL変化・気になる点">
                       <textarea value={visit.adlNotes}
