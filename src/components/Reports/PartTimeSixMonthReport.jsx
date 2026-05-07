@@ -4,6 +4,7 @@ import { correctText, summarizePatientDailyReports } from '../../utils/anthropic
 import { generatePartTimeSixMonthExcel } from '../../utils/excel';
 import { generateId } from '../../utils/helpers';
 import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import ReportAIGenerator from './ReportAIGenerator';
 
 const REPORT_FIELDS = [
   ['initialStatus', '施術開始時の状況', '施術開始時の身体・生活状況を記入...', 3],
@@ -17,7 +18,7 @@ const REPORT_FIELDS = [
 ];
 
 export default function PartTimeSixMonthReport() {
-  const { selectedPatient, reports, saveReports, patientDailyReports, settings } = useApp();
+  const { selectedPatient, reports, saveReports, dailyReports: allScheduleDailyReports, settings } = useApp();
   const p = selectedPatient;
 
   const [form, setForm] = useState({
@@ -36,9 +37,21 @@ export default function PartTimeSixMonthReport() {
 
   const set = (key, val) => { setForm(f => ({ ...f, [key]: val })); setSaved(false); };
 
-  // この患者の日報を日付の新しい順に取得
-  const allDailyReports = (patientDailyReports || [])
-    .filter(r => r.patientId === p.id)
+  // この患者の日報をスケジュール日報から取得
+  const allDailyReports = (allScheduleDailyReports || [])
+    .filter(r => (r.visits || []).some(v => v.patientId === p.id && v.visited))
+    .map(r => {
+      const visit = (r.visits || []).find(v => v.patientId === p.id);
+      return {
+        date: r.date,
+        condition: visit?.condition || '',
+        treatment: visit?.notes || '',
+        adlNotes: visit?.adlNotes || '',
+        specialNotes: visit?.specialNotes || '',
+        reaction: '',
+        mentalCare: '',
+      };
+    })
     .sort((a, b) => b.date.localeCompare(a.date));
 
   // recordDate から6ヶ月前を計算
@@ -191,6 +204,16 @@ export default function PartTimeSixMonthReport() {
           </p>
         )}
       </div>
+
+      {/* AI報告書生成 */}
+      <ReportAIGenerator
+        patient={p}
+        dailyReportList={periodReports}
+        period={`${sixMonthsAgo.replace(/-/g, '/')} 〜 ${form.recordDate.replace(/-/g, '/')}`}
+        reportType="sixmonth"
+        apiKey={settings.apiKey}
+        onAutoFill={() => handleSummarize()}
+      />
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{error}</div>}
 

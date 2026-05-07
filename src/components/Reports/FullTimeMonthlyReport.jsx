@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { correctMonthlyReport } from '../../utils/anthropic';
+import { correctMonthlyReport, summarizeMonthlyReport } from '../../utils/anthropic';
 import { generateId, getCurrentYearMonth, REPORT_LABELS } from '../../utils/helpers';
 import CopyButton from '../Common/CopyButton';
-import { Sparkles, Loader2, History, ChevronDown, ChevronUp } from 'lucide-react';
+import ReportAIGenerator from './ReportAIGenerator';
+import { Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 const SECTIONS = [
   ['healthCondition', '① 体調・生活状況', '体調や日常生活の様子を記入...'],
@@ -15,7 +16,7 @@ const SECTIONS = [
 ];
 
 export default function FullTimeMonthlyReport() {
-  const { selectedPatient, reports, saveReports, settings } = useApp();
+  const { selectedPatient, reports, saveReports, dailyReports, settings } = useApp();
   const p = selectedPatient;
   const { year: cy, month: cm } = getCurrentYearMonth();
 
@@ -36,6 +37,44 @@ export default function FullTimeMonthlyReport() {
     .sort((a, b) => b.year !== a.year ? b.year - a.year : b.month - a.month);
 
   const set = (key, val) => setSections(s => ({ ...s, [key]: val }));
+
+  const [summarizing, setSummarizing] = useState(false);
+
+  const handleAutoFill = async () => {
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    const monthReports = (dailyReports || [])
+      .filter(r => r.date.startsWith(monthStr))
+      .map(r => ({ date: r.date, ...(r.visits || []).find(v => v.patientId === p.id && v.visited) }))
+      .filter(r => r.patientId);
+
+    if (monthReports.length === 0) {
+      alert('この月の日報が見つかりません。先に日報を入力してください。');
+      return;
+    }
+    if (!settings.apiKey) {
+      alert('APIキーが設定されていません。設定画面で入力してください。');
+      return;
+    }
+    setSummarizing(true);
+    setError('');
+    try {
+      const result = await summarizeMonthlyReport(p.name, year, month, monthReports, settings.apiKey);
+      setSections({
+        healthCondition: result.healthCondition || '',
+        physicalCondition: result.physicalCondition || '',
+        treatmentContent: result.treatmentContent || '',
+        treatmentResponse: result.treatmentResponse || '',
+        lifeObservations: result.lifeObservations || '',
+        futurePolicy: result.futurePolicy || '',
+      });
+      setCorrected('');
+      setSaved(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSummarizing(false);
+    }
+  };
 
   const buildText = (data) => {
     const s = data || sections;
@@ -103,7 +142,30 @@ export default function FullTimeMonthlyReport() {
         </div>
       </Card>
 
+      {/* AI報告書生成 */}
+      {(() => {
+        const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+        const monthReports = (dailyReports || [])
+          .filter(r => r.date.startsWith(monthStr))
+          .map(r => ({ date: r.date, ...(r.visits || []).find(v => v.patientId === p.id && v.visited) }))
+          .filter(r => r.patientId);
+        return (
+          <ReportAIGenerator
+            patient={p}
+            dailyReportList={monthReports}
+            period={`${year}年${month}月`}
+            reportType="monthly"
+            apiKey={settings.apiKey}
+            onAutoFill={() => handleAutoFill()}
+          />
+        );
+      })()}
+
       <Card title="月次内容">
+        <button onClick={handleAutoFill} disabled={summarizing}
+          className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-colors mb-3 disabled:opacity-60">
+          {summarizing ? <><Loader2 size={16} className="animate-spin" />AIがまとめ中...</> : <>日報からAIで自動入力（{year}年{month}月）</>}
+        </button>
         {SECTIONS.map(([key, label, placeholder]) => (
           <Field key={key} label={label}>
             <textarea value={sections[key]} onChange={e => set(key, e.target.value)}
