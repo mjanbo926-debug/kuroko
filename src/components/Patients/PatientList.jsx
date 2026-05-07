@@ -6,13 +6,21 @@ export default function PatientList() {
   const { patients, navigate } = useApp();
   const [tab, setTab] = useState('fullTime');
   const [query, setQuery] = useState('');
+  const [showTerminated, setShowTerminated] = useState(false);
 
-  const filtered = patients.filter(p =>
+  const activePatients = patients.filter(p => !p.terminated);
+  const terminatedPatients = patients.filter(p => p.terminated);
+
+  const filtered = activePatients.filter(p =>
     p.type === tab &&
     (!query || p.name?.includes(query) || p.address?.includes(query))
   );
-  const ftCount = patients.filter(p => p.type === 'fullTime').length;
-  const ptCount = patients.filter(p => p.type === 'partTime').length;
+  const terminatedFiltered = terminatedPatients.filter(p =>
+    p.type === tab &&
+    (!query || p.name?.includes(query) || p.address?.includes(query))
+  );
+  const ftCount = activePatients.filter(p => p.type === 'fullTime').length;
+  const ptCount = activePatients.filter(p => p.type === 'partTime').length;
 
   return (
     <div>
@@ -57,32 +65,60 @@ export default function PatientList() {
           ))}
         </div>
       )}
+
+      {terminatedFiltered.length > 0 && (
+        <div className="mt-4">
+          <button onClick={() => setShowTerminated(!showTerminated)}
+            className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 py-2">
+            {showTerminated ? '▲' : '▼'} 終了した患者（{terminatedFiltered.length}名）
+          </button>
+          {showTerminated && (
+            <div className="space-y-3 mt-2">
+              {terminatedFiltered.map(p => (
+                <PatientCard key={p.id} patient={p} terminated
+                  onClick={() => navigate('patient-detail', { patient: p })} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function PatientCard({ patient, onClick }) {
+function PatientCard({ patient, onClick, terminated }) {
   const days = Array.isArray(patient.visitDays)
     ? patient.visitDays.join('・')
     : (patient.visitDays || '');
   return (
     <button onClick={onClick}
-      className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-left hover:shadow-md hover:border-blue-100 transition-all">
+      className={`w-full rounded-2xl shadow-sm border p-4 text-left transition-all ${
+        terminated
+          ? 'bg-gray-50 border-gray-200 opacity-70 hover:opacity-90'
+          : 'bg-white border-gray-100 hover:shadow-md hover:border-blue-100'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-semibold text-gray-900 text-lg">{patient.name}</span>
+          <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+            <span className={`font-semibold text-lg ${terminated ? 'text-gray-500' : 'text-gray-900'}`}>{patient.name}</span>
             <span className="text-gray-400 text-sm">{patient.age}歳 / {patient.gender}</span>
+            {terminated && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-500 font-medium">
+                終了：{patient.terminatedReason}
+              </span>
+            )}
           </div>
           {patient.address && (
             <div className="flex items-center gap-1.5 text-gray-500 text-sm mb-1">
               <MapPin size={13} /><span className="truncate">{patient.address}</span>
             </div>
           )}
-          {days && (
+          {!terminated && days && (
             <div className="flex items-center gap-1.5 text-gray-500 text-sm">
               <Calendar size={13} /><span>{days}曜日 {patient.visitTime}</span>
             </div>
+          )}
+          {terminated && patient.terminatedDate && (
+            <p className="text-xs text-gray-400 mt-0.5">終了日：{patient.terminatedDate.replace(/-/g, '/')}</p>
           )}
           {patient.diagnosis && (
             <p className="text-xs text-gray-400 mt-1 truncate">{patient.diagnosis}</p>

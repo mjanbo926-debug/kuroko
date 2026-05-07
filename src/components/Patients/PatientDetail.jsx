@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2 } from 'lucide-react';
+import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2, XCircle } from 'lucide-react';
 import { formatDate, REPORT_LABELS } from '../../utils/helpers';
 
 const ADL_LABELS = [
@@ -21,6 +21,10 @@ export default function PatientDetail() {
   const [newSpotDate, setNewSpotDate] = useState('');
   const [newSpotTime, setNewSpotTime] = useState('');
   const [newAbsentDate, setNewAbsentDate] = useState('');
+  const [showTerminateForm, setShowTerminateForm] = useState(false);
+  const [terminateReason, setTerminateReason] = useState('');
+  const [terminateReasonNote, setTerminateReasonNote] = useState('');
+  const [terminateDate, setTerminateDate] = useState(new Date().toISOString().split('T')[0]);
 
   const patient = patients.find(p => p.id === selectedPatient?.id) || selectedPatient;
   if (!patient) return null;
@@ -65,6 +69,29 @@ export default function PatientDetail() {
   const removeAbsentDate = (date) => {
     const updated = patients.map(p =>
       p.id === patient.id ? { ...p, absentDates: (p.absentDates || []).filter(d => d !== date) } : p
+    );
+    savePatients(updated);
+  };
+
+  const handleTerminate = () => {
+    if (!terminateReason) return;
+    const reason = terminateReason === 'その他' && terminateReasonNote
+      ? `その他（${terminateReasonNote}）`
+      : terminateReason;
+    const updated = patients.map(p =>
+      p.id === patient.id
+        ? { ...p, terminated: true, terminatedReason: reason, terminatedDate: terminateDate, status: '', statusNote: '' }
+        : p
+    );
+    savePatients(updated);
+    setShowTerminateForm(false);
+  };
+
+  const handleReactivate = () => {
+    const updated = patients.map(p =>
+      p.id === patient.id
+        ? { ...p, terminated: false, terminatedReason: '', terminatedDate: '' }
+        : p
     );
     savePatients(updated);
   };
@@ -275,61 +302,6 @@ export default function PatientDetail() {
       )}
 
       {/* 副業先：日報セクション */}
-      {patient.type === 'partTime' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-600">施術日報</h3>
-            <span className="text-xs text-gray-400">{dailyReports.length}件記録済み</span>
-          </div>
-
-          <button
-            onClick={() => navigate('patient-daily-report', { patient, date: todayStr })}
-            className={`w-full flex items-center justify-between p-3.5 rounded-xl border mb-3 transition-all ${
-              hasTodayReport
-                ? 'bg-green-50 border-green-200 hover:bg-green-100'
-                : 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100'}`}>
-            <div className="flex items-center gap-3">
-              <NotebookPen size={20} className={hasTodayReport ? 'text-green-600' : 'text-emerald-600'} />
-              <div className="text-left">
-                <div className={`font-semibold text-sm ${hasTodayReport ? 'text-green-800' : 'text-emerald-800'}`}>
-                  {hasTodayReport ? '今日の日報（記録済み）' : '今日の日報を記入'}
-                </div>
-                <div className="text-xs text-gray-400">{new Date().toLocaleDateString('ja-JP')}</div>
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-gray-400" />
-          </button>
-
-          {dailyReports.length > 0 && (
-            <>
-              <button className="w-full flex items-center justify-between py-1"
-                onClick={() => setDailyHistoryOpen(!dailyHistoryOpen)}>
-                <span className="text-xs text-gray-500 font-medium">過去の日報を見る</span>
-                {dailyHistoryOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-              </button>
-              {dailyHistoryOpen && (
-                <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto">
-                  {dailyReports.map(r => (
-                    <button key={r.id}
-                      onClick={() => navigate('patient-daily-report', { patient, date: r.date })}
-                      className="w-full flex items-start justify-between p-3 bg-gray-50 hover:bg-emerald-50 rounded-xl transition-colors text-left">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800">{r.date.replace(/-/g, '/')}</div>
-                        {(r.treatment || r.condition) && (
-                          <div className="text-xs text-gray-400 truncate mt-0.5">
-                            {r.condition || r.treatment}
-                          </div>
-                        )}
-                      </div>
-                      <ChevronRight size={15} className="text-gray-300 shrink-0 mt-0.5" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
 
       {/* 報告書作成 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -382,6 +354,67 @@ export default function PatientDetail() {
                   <span className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('ja-JP')}</span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 施術終了 */}
+      {patient.terminated ? (
+        <div className="bg-gray-100 border border-gray-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-gray-600 font-semibold text-sm">
+            <XCircle size={16} className="text-gray-500" />施術終了済み
+          </div>
+          <div className="text-sm text-gray-700 space-y-1">
+            <p>終了日：<span className="font-medium">{patient.terminatedDate?.replace(/-/g, '/') || '不明'}</span></p>
+            <p>理由：<span className="font-medium">{patient.terminatedReason || '不明'}</span></p>
+          </div>
+          <button onClick={handleReactivate}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+            終了を取り消して再開する
+          </button>
+        </div>
+      ) : (
+        <div className="border border-gray-200 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setShowTerminateForm(!showTerminateForm)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-500 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2">
+              <XCircle size={16} className="text-gray-400" />
+              施術終了を記録する
+            </div>
+            {showTerminateForm ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+          </button>
+          {showTerminateForm && (
+            <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3 bg-white">
+              <div>
+                <p className="text-xs text-gray-500 mb-2 font-medium">終了理由</p>
+                <div className="flex gap-2 flex-wrap">
+                  {['お亡くなり', '転居', '卒業', 'その他'].map(r => (
+                    <button key={r} onClick={() => setTerminateReason(r)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                        terminateReason === r
+                          ? 'bg-gray-700 text-white border-gray-700'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                {terminateReason === 'その他' && (
+                  <input value={terminateReasonNote} onChange={e => setTerminateReasonNote(e.target.value)}
+                    placeholder="理由を入力..."
+                    className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" />
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1 font-medium">終了日</p>
+                <input type="date" value={terminateDate} onChange={e => setTerminateDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" />
+              </div>
+              <button onClick={handleTerminate} disabled={!terminateReason}
+                className="w-full py-2.5 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-40 transition-colors">
+                施術終了として記録する
+              </button>
             </div>
           )}
         </div>

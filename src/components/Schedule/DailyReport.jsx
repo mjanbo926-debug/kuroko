@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../App';
 import { generateId, localDateStr } from '../../utils/helpers';
-import { Check, X, ChevronDown, ChevronUp, Save, FileText, User } from 'lucide-react';
+import { Check, X, ChevronDown, ChevronUp, Save, User } from 'lucide-react';
 
 const DAYS = ['月', '火', '水', '木', '金', '土', '日'];
 const JS_DAY_TO_IDX = [6, 0, 1, 2, 3, 4, 5];
@@ -21,6 +21,7 @@ function getPatientsForDate(patients, dateStr, overrides) {
   const dayLabel = getDayLabel(dateStr);
   const ov = (overrides || {})[dateStr] || {};
   const normally = patients.filter(p =>
+    !p.terminated &&
     (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel)
   );
   const afterRemoval = normally.filter(p => !(ov.removed || []).includes(p.id));
@@ -48,8 +49,8 @@ export default function DailyReport() {
         visited: saved?.visited ?? true,
         condition: saved?.condition ?? '',
         notes: saved?.notes ?? '',
-        reaction: saved?.reaction ?? '',
-        absent: saved?.absent ?? '',
+        adlNotes: saved?.adlNotes ?? '',
+        specialNotes: saved?.specialNotes ?? '',
       };
     });
 
@@ -199,13 +200,20 @@ export default function DailyReport() {
                         className={ta()} rows={3}
                         placeholder="実施した施術内容、所見などを記入..." />
                     </Field>
-
-                    {/* 患者詳細へのリンク */}
-                    <button
-                      onClick={() => navigate('patient-detail', { patient })}
-                      className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700">
-                      <FileText size={13} />患者詳細・報告書作成
-                    </button>
+                    <Field label="ADL変化・気になる点">
+                      <textarea
+                        value={visit.adlNotes}
+                        onChange={e => setVisit(visit.patientId, 'adlNotes', e.target.value)}
+                        className={ta()} rows={2}
+                        placeholder="ADLの変化、生活面で気になった点..." />
+                    </Field>
+                    <Field label="特記事項">
+                      <textarea
+                        value={visit.specialNotes}
+                        onChange={e => setVisit(visit.patientId, 'specialNotes', e.target.value)}
+                        className={ta()} rows={2}
+                        placeholder="特記事項・申し送りなど..." />
+                    </Field>
                   </div>
                 )}
               </div>

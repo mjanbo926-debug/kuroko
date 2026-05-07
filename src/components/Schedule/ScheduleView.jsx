@@ -35,6 +35,7 @@ function getEffectivePatients(patients, date, overrides) {
 
   const holiday = isJapaneseHoliday(dateStr);
   const normally = patients.filter(p => {
+    if (p.terminated) return false;
     if (p.visitSchedule === 'spot') return (p.spotDates || []).some(s => (s.date || s) === dateStr);
     if (p.type === 'fullTime' && holiday) return false;
     return (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel);
