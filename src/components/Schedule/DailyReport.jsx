@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../App';
 import { generateId, localDateStr } from '../../utils/helpers';
 import { Check, X, ChevronDown, ChevronUp, Save, User } from 'lucide-react';
 
 const DAYS = ['月', '火', '水', '木', '金', '土', '日'];
 const JS_DAY_TO_IDX = [6, 0, 1, 2, 3, 4, 5];
+
+const BODY_PARTS = ['腰部', '頸部', '下肢', '肩部', '上肢', '背部', '腹部'];
+const CONDITION_OPTIONS = ['改善傾向', '変化なし', 'やや悪化', '悪化', '好調'];
 
 function getDayLabel(dateStr) {
   const d = new Date(dateStr);
@@ -38,7 +41,6 @@ export default function DailyReport() {
   const date = selectedDate || localDateStr();
   const scheduledPatients = getPatientsForDate(patients, date, scheduleOverrides);
 
-  // 既存の日報があれば読み込む
   const existing = dailyReports.find(r => r.date === date);
 
   const initVisits = () =>
@@ -47,6 +49,8 @@ export default function DailyReport() {
       return {
         patientId: p.id,
         visited: saved?.visited ?? true,
+        bodyParts: saved?.bodyParts ?? [],
+        patientCondition: saved?.patientCondition ?? '',
         condition: saved?.condition ?? '',
         notes: saved?.notes ?? '',
         adlNotes: saved?.adlNotes ?? '',
@@ -59,13 +63,22 @@ export default function DailyReport() {
   const [expanded, setExpanded] = useState({});
   const [saved, setSaved] = useState(false);
 
-  // 未スケジュール患者の追加分（既存日報に含まれる）
   const extraVisits = existing?.visits?.filter(
     v => !scheduledPatients.find(p => p.id === v.patientId)
   ) ?? [];
 
   const setVisit = (patientId, key, val) => {
     setVisits(vs => vs.map(v => v.patientId === patientId ? { ...v, [key]: val } : v));
+    setSaved(false);
+  };
+
+  const toggleBodyPart = (patientId, part) => {
+    setVisits(vs => vs.map(v => {
+      if (v.patientId !== patientId) return v;
+      const parts = v.bodyParts || [];
+      const next = parts.includes(part) ? parts.filter(p => p !== part) : [...parts, part];
+      return { ...v, bodyParts: next };
+    }));
     setSaved(false);
   };
 
@@ -115,13 +128,11 @@ export default function DailyReport() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <div className="flex justify-between text-xs text-gray-500 mb-2">
             <span>訪問進捗</span>
-            <span>{scheduledPatients.length > 0 ? Math.round(visitedCount / scheduledPatients.length * 100) : 0}%</span>
+            <span>{Math.round(visitedCount / scheduledPatients.length * 100)}%</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2">
-            <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${scheduledPatients.length > 0 ? (visitedCount / scheduledPatients.length) * 100 : 0}%` }}
-            />
+            <div className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${(visitedCount / scheduledPatients.length) * 100}%` }} />
           </div>
           <div className="flex gap-4 mt-2 text-xs">
             <span className="text-green-600 font-medium">訪問済み {visitedCount}名</span>
@@ -143,6 +154,7 @@ export default function DailyReport() {
             const patient = patients.find(p => p.id === visit.patientId);
             if (!patient) return null;
             const isExpanded = expanded[visit.patientId];
+            const hasRecord = (visit.bodyParts?.length > 0) || visit.patientCondition || visit.notes || visit.condition;
 
             return (
               <div key={visit.patientId}
@@ -150,13 +162,10 @@ export default function DailyReport() {
                   visit.visited ? 'border-gray-100' : 'border-orange-100 bg-orange-50/30'}`}>
                 {/* 患者ヘッダー */}
                 <div className="flex items-center gap-3 p-4">
-                  {/* 訪問済みトグル */}
                   <button
                     onClick={() => setVisit(visit.patientId, 'visited', !visit.visited)}
                     className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                      visit.visited
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-400'}`}>
+                      visit.visited ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
                     {visit.visited ? <Check size={16} strokeWidth={3} /> : <X size={14} />}
                   </button>
 
@@ -168,12 +177,18 @@ export default function DailyReport() {
                         {patient.type === 'fullTime' ? '正' : '副'}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
                       {patient.visitTime && <span>{patient.visitTime}</span>}
-                      {visit.visited && (visit.notes || visit.condition) && (
-                        <span className="ml-2 text-blue-500">記録あり</span>
+                      {visit.patientCondition && (
+                        <span className="text-blue-500">{visit.patientCondition}</span>
                       )}
-                      {!visit.visited && <span className="text-orange-500 ml-1">未訪問</span>}
+                      {visit.bodyParts?.length > 0 && (
+                        <span className="text-gray-500">{visit.bodyParts.join('・')}</span>
+                      )}
+                      {hasRecord && !visit.patientCondition && !visit.bodyParts?.length && (
+                        <span className="text-blue-500">記録あり</span>
+                      )}
+                      {!visit.visited && <span className="text-orange-500">未訪問</span>}
                     </div>
                   </div>
 
@@ -185,34 +200,70 @@ export default function DailyReport() {
 
                 {/* 展開：記録フォーム */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                  <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-3">
+
+                    {/* 施術部位 */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">施術部位</p>
+                      <div className="flex flex-wrap gap-2">
+                        {BODY_PARTS.map(part => {
+                          const selected = (visit.bodyParts || []).includes(part);
+                          return (
+                            <button key={part} onClick={() => toggleBodyPart(visit.patientId, part)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                                selected
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                              {part}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 患者の状態 */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">患者の状態</p>
+                      <div className="flex flex-wrap gap-2">
+                        {CONDITION_OPTIONS.map(opt => {
+                          const selected = visit.patientCondition === opt;
+                          const colors = {
+                            '改善傾向': selected ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200 hover:border-green-400',
+                            '好調': selected ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400',
+                            '変化なし': selected ? 'bg-gray-500 text-white border-gray-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400',
+                            'やや悪化': selected ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-200 hover:border-orange-400',
+                            '悪化': selected ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-600 border-red-200 hover:border-red-400',
+                          };
+                          return (
+                            <button key={opt}
+                              onClick={() => setVisit(visit.patientId, 'patientCondition', selected ? '' : opt)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${colors[opt]}`}>
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     <Field label="体調・生活状況">
-                      <textarea
-                        value={visit.condition}
+                      <textarea value={visit.condition}
                         onChange={e => setVisit(visit.patientId, 'condition', e.target.value)}
-                        className={ta()} rows={2}
-                        placeholder="本日の体調・生活状況を記入..." />
+                        className={ta()} rows={2} placeholder="本日の体調・生活状況を記入..." />
                     </Field>
                     <Field label="施術内容・メモ">
-                      <textarea
-                        value={visit.notes}
+                      <textarea value={visit.notes}
                         onChange={e => setVisit(visit.patientId, 'notes', e.target.value)}
-                        className={ta()} rows={3}
-                        placeholder="実施した施術内容、所見などを記入..." />
+                        className={ta()} rows={3} placeholder="実施した施術内容、所見などを記入..." />
                     </Field>
                     <Field label="ADL変化・気になる点">
-                      <textarea
-                        value={visit.adlNotes}
+                      <textarea value={visit.adlNotes}
                         onChange={e => setVisit(visit.patientId, 'adlNotes', e.target.value)}
-                        className={ta()} rows={2}
-                        placeholder="ADLの変化、生活面で気になった点..." />
+                        className={ta()} rows={2} placeholder="ADLの変化、生活面で気になった点..." />
                     </Field>
                     <Field label="特記事項">
-                      <textarea
-                        value={visit.specialNotes}
+                      <textarea value={visit.specialNotes}
                         onChange={e => setVisit(visit.patientId, 'specialNotes', e.target.value)}
-                        className={ta()} rows={2}
-                        placeholder="特記事項・申し送りなど..." />
+                        className={ta()} rows={2} placeholder="特記事項・申し送りなど..." />
                     </Field>
                   </div>
                 )}
@@ -225,19 +276,15 @@ export default function DailyReport() {
       {/* 全体メモ */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
         <h3 className="text-sm font-semibold text-gray-700">全体メモ・申し送り</h3>
-        <textarea
-          value={generalNotes}
+        <textarea value={generalNotes}
           onChange={e => { setGeneralNotes(e.target.value); setSaved(false); }}
-          className={ta()} rows={3}
-          placeholder="今日の全体的な申し送り、特記事項など..." />
+          className={ta()} rows={3} placeholder="今日の全体的な申し送り、特記事項など..." />
       </div>
 
       {/* 保存ボタン */}
       <button onClick={handleSave}
         className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-semibold text-base transition-all ${
-          saved
-            ? 'bg-green-500 text-white'
-            : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98]'}`}>
+          saved ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98]'}`}>
         {saved ? <><Check size={20} strokeWidth={3} />保存しました</> : <><Save size={20} />日報を保存</>}
       </button>
 
