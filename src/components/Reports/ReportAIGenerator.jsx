@@ -40,7 +40,7 @@ export default function ReportAIGenerator({ patient, dailyReportList, period, re
             </div>
             <p className="text-xs text-gray-400 mt-0.5">
               {count > 0
-                ? `日報 ${count}件 → ケアマネ・主治医向け報告書文章（400〜600字）`
+                ? `日報 ${count}件 → ${reportType === 'monthly' ? '①〜⑥の月次フォーマット' : '■項目の半年次フォーマット'}で生成`
                 : '対象期間内の日報がありません'}
             </p>
           </div>

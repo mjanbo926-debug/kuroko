@@ -124,9 +124,27 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
       return `【${r.date}】\n${lines.join('\n') || '（記録なし）'}`;
     }).join('\n\n');
 
+  const formatSection = reportType === 'monthly'
+    ? `以下の6項目の見出しをそのまま使い、各項目を2〜3文で記述してください：
+
+① 体調・生活状況
+② 身体状況（疼痛・可動域・筋緊張など）
+③ 施術内容
+④ 施術中・施術後の反応
+⑤ 生活面での気になる点・連携事項
+⑥ 今後の対応方針`
+    : `以下の項目の見出しをそのまま使い、各項目を2〜3文で記述してください：
+
+■ 施術開始時の状況
+■ 施術内容
+■ 声かけ・メンタルケア
+■ 現状
+■ 今後の取り組み
+■ 特記事項`;
+
   const typeLabel = reportType === 'monthly' ? '月次' : '半年次';
   const prompt = `以下は${patientName}様の${period}の施術記録です（${count}回分）。
-これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書の文章を作成してください。
+これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書を作成してください。
 
 【施術サマリー】
 - 施術回数：${count}回${topParts.length ? `\n- 主な施術部位：${topParts.join('・')}` : ''}${topTreats.length ? `\n- 主な施術内容：${topTreats.join('・')}` : ''}${topCondition ? `\n- 全体的な状態傾向：${topCondition}` : ''}
@@ -134,14 +152,16 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
 【施術記録（時系列）】
 ${reportsText}
 
-【出力要件】
+【出力フォーマット】
+${formatSection}
+
+【共通ルール】
 - です・ます調で統一
 - 観察・所見ベースの表現（〜がみられます、〜の傾向がうかがえます）
 - 医学的断定・治療効果の断定は避ける
-- 400〜600文字程度
-- 対象期間・施術回数・経過の変化・現在の状態・今後の方針を含む
 - 箇条書きは使わず文章形式で
-- 報告書文章のみ出力（前置き・説明・見出し不要）`;
+- 各項目の見出しの後に改行して本文を記述すること
+- 余分な前置き・後書き・説明は不要`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -153,7 +173,7 @@ ${reportsText}
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
+      max_tokens: 2048,
       stream: true,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
