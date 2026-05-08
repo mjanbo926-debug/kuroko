@@ -64,6 +64,18 @@ export default function PartTimeSixMonthReport() {
         return `${e.position}：${content}`;
       }).join('　／　');
 
+  // 施術体位から施術内容テキストを生成（改行区切り）
+  const applyPositionToContent = () => {
+    const lines = positionEntries
+      .filter(e => e.tags.length > 0 || e.memo)
+      .map(e => {
+        const content = [...e.tags, ...(e.memo ? [e.memo] : [])].join('・');
+        return `${e.position}：${content}`;
+      });
+    if (lines.length === 0) return;
+    set('treatmentContent', lines.join('\n'));
+  };
+
   // この患者の日報をスケジュール日報から取得
   const allDailyReports = (allScheduleDailyReports || [])
     .filter(r => (r.visits || []).some(v => v.patientId === p.id && v.visited))
@@ -379,8 +391,13 @@ ${form.specialNotes}`;
           </button>
         </div>
         {buildPositionText() && (
-          <div className="bg-blue-50 rounded-xl px-3 py-2 text-xs text-blue-800 mt-1">
-            <span className="font-medium">プレビュー：</span>{buildPositionText()}
+          <div className="bg-blue-50 rounded-xl px-3 py-2 text-xs text-blue-800 mt-1 space-y-2">
+            <p><span className="font-medium">プレビュー：</span>{buildPositionText()}</p>
+            <button
+              onClick={applyPositionToContent}
+              className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition-colors">
+              ↓ 施術内容に反映
+            </button>
           </div>
         )}
       </Card>
