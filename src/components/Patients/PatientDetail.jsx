@@ -306,6 +306,32 @@ export default function PatientDetail() {
       {/* 報告書作成 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <h3 className="text-sm font-semibold text-gray-600 mb-3">報告書作成</h3>
+
+        {/* 副業先：施術報告書の要否設定 */}
+        {patient.type === 'partTime' && (
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5 mb-3">
+            <div>
+              <p className="text-sm font-medium text-gray-700">施術報告書（半年毎）が必要</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {patient.requiresSixMonthReport === false ? '不要（複数名担当など）' : '必要（担当者として作成）'}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const current = patient.requiresSixMonthReport !== false;
+                const updated = patients.map(p =>
+                  p.id === patient.id ? { ...p, requiresSixMonthReport: !current } : p
+                );
+                savePatients(updated);
+              }}
+              className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${
+                patient.requiresSixMonthReport !== false ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                patient.requiresSixMonthReport !== false ? 'translate-x-6' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-2">
           {reportButtons.map(({ view, label, sub, color }) => (
             <button key={view} onClick={() => navigate(view, { patient })}

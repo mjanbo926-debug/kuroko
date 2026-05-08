@@ -190,8 +190,8 @@ ${form.specialNotes}`;
         <p className="text-sm text-gray-500 mt-0.5">副業先・半年毎 — Excel出力</p>
       </div>
 
-      {/* 次回作成リマインダー */}
-      {(() => {
+      {/* 次回作成リマインダー（要フラグが立っている場合のみ） */}
+      {p.requiresSixMonthReport !== false && (() => {
         if (!lastDate) return (
           <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-3">
             <AlertTriangle size={18} className="text-yellow-600 shrink-0" />

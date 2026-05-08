@@ -73,8 +73,10 @@ export default function MonthlyStats() {
   // 16回以上の患者
   const overLimitPatients = patients.filter(p => (visitCountMap[p.id] || 0) >= VISIT_LIMIT);
 
-  // 副業先：施術報告書リマインダー
-  const ptReportReminders = partTimePatients.map(p => {
+  // 副業先：施術報告書リマインダー（要フラグが立っている患者のみ）
+  const ptReportReminders = partTimePatients
+    .filter(p => p.requiresSixMonthReport !== false)
+    .map(p => {
     const saved = (reports || [])
       .filter(r => r.patientId === p.id && r.type === 'pt-sixmonth')
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
