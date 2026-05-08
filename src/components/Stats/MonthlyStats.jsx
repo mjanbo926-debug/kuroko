@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, FileText, CheckCircle2, Clock } from 'lucide-react';
 
 const VISIT_LIMIT = 16;
 
@@ -17,8 +17,29 @@ function getMonthDates(year, month) {
   return dates;
 }
 
+// 次回作成期限を計算（前回作成日 + 6ヶ月）
+function calcNextDue(lastDateStr) {
+  if (!lastDateStr) return null;
+  const d = new Date(lastDateStr);
+  d.setMonth(d.getMonth() + 6);
+  return d;
+}
+
+// 今日からの日数差
+function diffDays(date) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((date - today) / (1000 * 60 * 60 * 24));
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 export default function MonthlyStats() {
-  const { patients, dailyReports } = useApp();
+  const { patients, dailyReports, reports } = useApp();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -33,15 +54,13 @@ export default function MonthlyStats() {
   };
 
   const dates = getMonthDates(year, month);
-  const reports = dailyReports.filter(r => dates.includes(r.date));
+  const monthReports = dailyReports.filter(r => dates.includes(r.date));
 
   // 患者ごとの訪問回数
   const visitCountMap = {};
-  reports.forEach(r => {
+  monthReports.forEach(r => {
     (r.visits || []).forEach(v => {
-      if (v.visited) {
-        visitCountMap[v.patientId] = (visitCountMap[v.patientId] || 0) + 1;
-      }
+      if (v.visited) visitCountMap[v.patientId] = (visitCountMap[v.patientId] || 0) + 1;
     });
   });
 
@@ -54,9 +73,23 @@ export default function MonthlyStats() {
   // 16回以上の患者
   const overLimitPatients = patients.filter(p => (visitCountMap[p.id] || 0) >= VISIT_LIMIT);
 
+  // 副業先：施術報告書リマインダー
+  const ptReportReminders = partTimePatients.map(p => {
+    const saved = (reports || [])
+      .filter(r => r.patientId === p.id && r.type === 'pt-sixmonth')
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const latest = saved[0];
+    const lastDate = latest?.createdAt?.split('T')[0] || null;
+    const nextDue = calcNextDue(lastDate);
+    const days = nextDue ? diffDays(nextDue) : null;
+    return { patient: p, lastDate, nextDue, days };
+  });
+
+  // 期限30日以内 or 超過のみ警告表示
+  const urgentReminders = ptReportReminders.filter(r => r.days === null || r.days <= 30);
+
   return (
     <div className="space-y-4">
-      {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-800">月次集計</h2>
       </div>
@@ -73,6 +106,52 @@ export default function MonthlyStats() {
               <span className="text-sm font-bold text-orange-600">{visitCountMap[p.id]}回</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 副業先 施術報告書リマインダー（要注意のみ表示） */}
+      {urgentReminders.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+            <FileText size={16} className="text-emerald-600" />
+            <span className="text-sm font-semibold text-gray-700">副業先 施術報告書リマインダー</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {urgentReminders.map(({ patient, lastDate, nextDue, days }) => {
+              const isOverdue = days !== null && days < 0;
+              const isSoon = days !== null && days >= 0 && days <= 30;
+              const isNew = days === null;
+              return (
+                <div key={patient.id} className={`px-4 py-3 flex items-center justify-between gap-3 ${
+                  isOverdue ? 'bg-red-50/50' : isSoon ? 'bg-orange-50/50' : 'bg-yellow-50/50'}`}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{patient.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {lastDate ? `前回：${formatDate(lastDate)}` : '未作成'}
+                      {nextDue && ` → 次回：${formatDate(nextDue.toISOString().split('T')[0])}`}
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    {isOverdue && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 px-2.5 py-1 rounded-full">
+                        <AlertTriangle size={12} />{Math.abs(days)}日超過
+                      </span>
+                    )}
+                    {isSoon && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full">
+                        <Clock size={12} />あと{days}日
+                      </span>
+                    )}
+                    {isNew && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-yellow-700 bg-yellow-100 px-2.5 py-1 rounded-full">
+                        <FileText size={12} />未作成
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -115,13 +194,14 @@ export default function MonthlyStats() {
       {/* 患者ごと：正社員先 */}
       <Section title="正社員先" color="blue" patients={fullTimePatients} visitCountMap={visitCountMap} />
 
-      {/* 患者ごと：副業先 */}
-      <Section title="副業先" color="emerald" patients={partTimePatients} visitCountMap={visitCountMap} />
+      {/* 患者ごと：副業先（全員の報告書状況も表示） */}
+      <Section title="副業先" color="emerald" patients={partTimePatients} visitCountMap={visitCountMap}
+        reportReminders={ptReportReminders} />
     </div>
   );
 }
 
-function Section({ title, color, patients, visitCountMap }) {
+function Section({ title, color, patients, visitCountMap, reportReminders }) {
   const sorted = [...patients].sort((a, b) => (visitCountMap[b.id] || 0) - (visitCountMap[a.id] || 0));
   const total = sorted.reduce((s, p) => s + (visitCountMap[p.id] || 0), 0);
   const max = Math.max(...sorted.map(p => visitCountMap[p.id] || 0), 1);
@@ -145,12 +225,32 @@ function Section({ title, color, patients, visitCountMap }) {
           const count = visitCountMap[p.id] || 0;
           const pct = Math.round((count / max) * 100);
           const isOver = count >= VISIT_LIMIT;
+          const reminder = reportReminders?.find(r => r.patient.id === p.id);
+
           return (
             <div key={p.id} className={`px-4 py-3 ${isOver ? 'bg-orange-50/50' : ''}`}>
               <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-gray-800">{p.name}</span>
                   {isOver && <AlertTriangle size={14} className="text-orange-500" />}
+                  {/* 報告書バッジ */}
+                  {reminder && (() => {
+                    const { days } = reminder;
+                    if (days === null) return (
+                      <span className="text-xs text-yellow-700 bg-yellow-100 px-1.5 py-0.5 rounded-full">報告書未作成</span>
+                    );
+                    if (days < 0) return (
+                      <span className="text-xs text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">{Math.abs(days)}日超過</span>
+                    );
+                    if (days <= 30) return (
+                      <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full">あと{days}日</span>
+                    );
+                    return (
+                      <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={10} />あと{days}日
+                      </span>
+                    );
+                  })()}
                 </div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                   isOver ? 'bg-orange-100 text-orange-700' : c.badge}`}>

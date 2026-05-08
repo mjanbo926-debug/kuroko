@@ -3,7 +3,7 @@ import { useApp } from '../../App';
 import { correctText, summarizePatientDailyReports } from '../../utils/anthropic';
 import { generatePartTimeSixMonthExcel } from '../../utils/excel';
 import { generateId } from '../../utils/helpers';
-import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check, Plus, X } from 'lucide-react';
+import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check, Plus, X, Clock, AlertTriangle } from 'lucide-react';
 import ReportAIGenerator from './ReportAIGenerator';
 
 const POSITIONS = ['仰臥位', '右側臥位', '左側臥位', '腹臥位', '座位', '立位'];
@@ -160,6 +160,20 @@ ${form.specialNotes}`;
     generatePartTimeSixMonthExcel(p, { ...form, treatmentPositions: buildPositionText() }, corrected);
   };
 
+  // 報告書リマインダー計算
+  const lastReport = (reports || [])
+    .filter(r => r.patientId === p.id && r.type === 'pt-sixmonth')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+  const lastDate = lastReport?.createdAt?.split('T')[0] || null;
+  const nextDueDate = lastDate ? (() => {
+    const d = new Date(lastDate);
+    d.setMonth(d.getMonth() + 6);
+    return d;
+  })() : null;
+  const daysUntilDue = nextDueDate
+    ? Math.round((nextDueDate - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24))
+    : null;
+
   const handleSave = () => {
     const report = {
       id: generateId(), patientId: p.id, type: 'pt-sixmonth',
@@ -175,6 +189,48 @@ ${form.specialNotes}`;
         <h2 className="text-xl font-bold text-gray-800">施術報告書</h2>
         <p className="text-sm text-gray-500 mt-0.5">副業先・半年毎 — Excel出力</p>
       </div>
+
+      {/* 次回作成リマインダー */}
+      {(() => {
+        if (!lastDate) return (
+          <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-3">
+            <AlertTriangle size={18} className="text-yellow-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-yellow-800">まだ作成記録がありません</p>
+              <p className="text-xs text-yellow-600 mt-0.5">保存すると次回期限が自動で管理されます</p>
+            </div>
+          </div>
+        );
+        const nextStr = `${nextDueDate.getFullYear()}年${nextDueDate.getMonth()+1}月${nextDueDate.getDate()}日`;
+        const lastStr = `${lastDate.replace(/-/g, '/')}`;
+        if (daysUntilDue < 0) return (
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+            <AlertTriangle size={18} className="text-red-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-red-700">{Math.abs(daysUntilDue)}日超過しています</p>
+              <p className="text-xs text-red-500 mt-0.5">前回：{lastStr}　次回期限：{nextStr}</p>
+            </div>
+          </div>
+        );
+        if (daysUntilDue <= 30) return (
+          <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3">
+            <Clock size={18} className="text-orange-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-orange-700">あと{daysUntilDue}日で作成期限です</p>
+              <p className="text-xs text-orange-500 mt-0.5">前回：{lastStr}　次回期限：{nextStr}</p>
+            </div>
+          </div>
+        );
+        return (
+          <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-2xl px-4 py-3">
+            <Clock size={18} className="text-green-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-green-700">次回作成：{nextStr}（あと{daysUntilDue}日）</p>
+              <p className="text-xs text-green-500 mt-0.5">前回：{lastStr}</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 基本情報 */}
       <Card title="基本情報">
