@@ -3,19 +3,24 @@ import { useApp } from '../../App';
 import { correctText, summarizePatientDailyReports } from '../../utils/anthropic';
 import { generatePartTimeSixMonthExcel } from '../../utils/excel';
 import { generateId } from '../../utils/helpers';
-import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check, Plus, X } from 'lucide-react';
 import ReportAIGenerator from './ReportAIGenerator';
+
+const POSITIONS = ['仰臥位', '右側臥位', '左側臥位', '腹臥位', '座位', '立位'];
+
+const TREATMENT_TAGS = ['マッサージ', 'ストレッチ', '関節可動域訓練', '運動療法', '歩行訓練', 'ローラー鍼'];
 
 const REPORT_FIELDS = [
   ['initialStatus', '施術開始時の状況', '施術開始時の身体・生活状況を記入...', 3],
   ['longTermGoal', '長期目標', '長期的な施術目標を記入...', 2],
   ['shortTermGoal', '短期目標', '短期的な施術目標を記入...', 2],
-  ['treatmentContent', '施術内容', '半年間の施術内容を記入...', 3],
   ['mentalCare', '声かけ・メンタルケア', '声かけやメンタルケアの内容を記入...', 2],
   ['currentStatus', '現状', '現在の身体・生活状況を記入...', 3],
   ['futureApproach', '今後の取り組み', '今後の施術方針・取り組みを記入...', 2],
   ['specialNotes', '特記事項', '特記事項があれば記入...', 2],
 ];
+
+const emptyPosition = () => ({ id: generateId(), position: '仰臥位', tags: [], memo: '' });
 
 export default function PartTimeSixMonthReport() {
   const { selectedPatient, reports, saveReports, dailyReports: allScheduleDailyReports, settings } = useApp();
@@ -25,9 +30,9 @@ export default function PartTimeSixMonthReport() {
     karteNo: '', recordDate: new Date().toISOString().split('T')[0],
     treatmentCount: '',
     initialStatus: '', longTermGoal: '', shortTermGoal: '',
-    treatmentContent: '', mentalCare: '',
-    currentStatus: '', futureApproach: '', specialNotes: '',
+    mentalCare: '', currentStatus: '', futureApproach: '', specialNotes: '',
   });
+  const [positionEntries, setPositionEntries] = useState([emptyPosition()]);
   const [corrected, setCorrected] = useState('');
   const [loading, setLoading] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
@@ -36,6 +41,27 @@ export default function PartTimeSixMonthReport() {
   const [dailyOpen, setDailyOpen] = useState(false);
 
   const set = (key, val) => { setForm(f => ({ ...f, [key]: val })); setSaved(false); };
+
+  // 体位エントリ操作
+  const addPosition = () => setPositionEntries(e => [...e, emptyPosition()]);
+  const removePosition = (id) => setPositionEntries(e => e.filter(x => x.id !== id));
+  const updatePosition = (id, key, val) =>
+    setPositionEntries(e => e.map(x => x.id === id ? { ...x, [key]: val } : x));
+  const toggleTag = (id, tag) =>
+    setPositionEntries(e => e.map(x => {
+      if (x.id !== id) return x;
+      const tags = x.tags.includes(tag) ? x.tags.filter(t => t !== tag) : [...x.tags, tag];
+      return { ...x, tags };
+    }));
+
+  // 施術体位を文字列化（報告書・AI用）
+  const buildPositionText = () =>
+    positionEntries
+      .filter(e => e.tags.length > 0 || e.memo)
+      .map(e => {
+        const content = [...e.tags, ...(e.memo ? [e.memo] : [])].join('、');
+        return `${e.position}：${content}`;
+      }).join('　／　');
 
   // この患者の日報をスケジュール日報から取得
   const allDailyReports = (allScheduleDailyReports || [])
@@ -48,13 +74,13 @@ export default function PartTimeSixMonthReport() {
         treatment: visit?.notes || '',
         adlNotes: visit?.adlNotes || '',
         specialNotes: visit?.specialNotes || '',
-        reaction: '',
-        mentalCare: '',
+        bodyParts: visit?.bodyParts || [],
+        treatmentTags: visit?.treatmentTags || [],
+        patientCondition: visit?.patientCondition || '',
       };
     })
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // recordDate から6ヶ月前を計算
   const sixMonthsAgo = (() => {
     const d = new Date(form.recordDate);
     d.setMonth(d.getMonth() - 6);
@@ -75,13 +101,12 @@ export default function PartTimeSixMonthReport() {
       setForm(f => ({
         ...f,
         initialStatus: result.initialStatus || f.initialStatus,
-        treatmentContent: result.treatmentContent || f.treatmentContent,
         mentalCare: result.mentalCare || f.mentalCare,
         currentStatus: result.currentStatus || f.currentStatus,
         futureApproach: result.futureApproach || f.futureApproach,
         specialNotes: result.specialNotes || f.specialNotes,
+        treatmentCount: f.treatmentCount || String(periodReports.length),
       }));
-      setForm(f => ({ ...f, treatmentCount: f.treatmentCount || String(periodReports.length) }));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -94,7 +119,34 @@ export default function PartTimeSixMonthReport() {
     setLoading(true);
     try {
       const days = Array.isArray(p.visitDays) ? p.visitDays.join('・') : (p.visitDays || '');
-      const raw = `【施術報告書】${p.name}様\n施術開始日：${p.startDate || ''}　施術曜日：${days}　施術回数：${form.treatmentCount}回\n傷病名：${p.diagnosis || ''}\n\n■ 施術開始時の状況\n${form.initialStatus}\n\n■ 長期目標\n${form.longTermGoal}\n\n■ 短期目標\n${form.shortTermGoal}\n\n■ 施術内容\n${form.treatmentContent}\n\n■ 声かけ・メンタルケア\n${form.mentalCare}\n\n■ 現状\n${form.currentStatus}\n\n■ 今後の取り組み\n${form.futureApproach}\n\n■ 特記事項\n${form.specialNotes}`;
+      const posText = buildPositionText();
+      const raw = `【施術報告書】${p.name}様
+施術開始日：${p.startDate || ''}　施術曜日：${days}　施術回数：${form.treatmentCount}回
+傷病名：${p.diagnosis || ''}
+
+■ 施術開始時の状況
+${form.initialStatus}
+
+■ 長期目標
+${form.longTermGoal}
+
+■ 短期目標
+${form.shortTermGoal}
+
+■ 施術内容（体位別）
+${posText || '記録なし'}
+
+■ 声かけ・メンタルケア
+${form.mentalCare}
+
+■ 現状
+${form.currentStatus}
+
+■ 今後の取り組み
+${form.futureApproach}
+
+■ 特記事項
+${form.specialNotes}`;
       const result = await correctText(raw, settings.apiKey);
       setCorrected(result);
     } catch (e) {
@@ -105,13 +157,13 @@ export default function PartTimeSixMonthReport() {
   };
 
   const handleExport = () => {
-    generatePartTimeSixMonthExcel(p, form, corrected);
+    generatePartTimeSixMonthExcel(p, { ...form, treatmentPositions: buildPositionText() }, corrected);
   };
 
   const handleSave = () => {
     const report = {
       id: generateId(), patientId: p.id, type: 'pt-sixmonth',
-      form, correctedText: corrected, createdAt: new Date().toISOString(),
+      form, positionEntries, correctedText: corrected, createdAt: new Date().toISOString(),
     };
     saveReports([...reports, report]);
     setSaved(true);
@@ -176,7 +228,7 @@ export default function PartTimeSixMonthReport() {
             {dailyOpen && (
               <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
                 {periodReports.map(r => (
-                  <div key={r.id} className="flex items-start gap-2 bg-white rounded-lg p-2 text-xs">
+                  <div key={r.date} className="flex items-start gap-2 bg-white rounded-lg p-2 text-xs">
                     <span className="font-medium text-gray-700 shrink-0">{r.date.replace(/-/g, '/')}</span>
                     <span className="text-gray-500 truncate">{r.treatment || r.condition || '（記録あり）'}</span>
                   </div>
@@ -216,6 +268,62 @@ export default function PartTimeSixMonthReport() {
       />
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{error}</div>}
+
+      {/* 施術体位 */}
+      <Card title="施術体位（体位別の施術内容）">
+        <div className="space-y-3">
+          {positionEntries.map((entry, idx) => (
+            <div key={entry.id} className="bg-gray-50 rounded-xl p-3 space-y-2 relative">
+              {/* 体位選択 + 削除 */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={entry.position}
+                  onChange={e => updatePosition(entry.id, 'position', e.target.value)}
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 font-medium">
+                  {POSITIONS.map(pos => <option key={pos}>{pos}</option>)}
+                </select>
+                {positionEntries.length > 1 && (
+                  <button onClick={() => removePosition(entry.id)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+              {/* 施術タグ */}
+              <div className="flex flex-wrap gap-1.5">
+                {TREATMENT_TAGS.map(tag => {
+                  const selected = entry.tags.includes(tag);
+                  return (
+                    <button key={tag} onClick={() => toggleTag(entry.id, tag)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+                        selected
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* 補足メモ */}
+              <input
+                value={entry.memo}
+                onChange={e => updatePosition(entry.id, 'memo', e.target.value)}
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="補足（例：腰部中心に、下肢末梢から...）"
+              />
+            </div>
+          ))}
+          <button onClick={addPosition}
+            className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
+            <Plus size={15} />体位を追加
+          </button>
+        </div>
+        {buildPositionText() && (
+          <div className="bg-blue-50 rounded-xl px-3 py-2 text-xs text-blue-800 mt-1">
+            <span className="font-medium">プレビュー：</span>{buildPositionText()}
+          </div>
+        )}
+      </Card>
 
       {/* 報告内容フォーム */}
       <Card title="報告内容">
