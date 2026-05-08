@@ -82,7 +82,10 @@ export default function MonthlyStats() {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     const latest = saved[0];
     const lastDate = latest?.createdAt?.split('T')[0] || null;
-    const nextDue = calcNextDue(lastDate);
+    // 手動設定日を優先、なければ前回+6ヶ月
+    const nextDue = p.nextReportDueDate
+      ? new Date(p.nextReportDueDate)
+      : calcNextDue(lastDate);
     const days = nextDue ? diffDays(nextDue) : null;
     return { patient: p, lastDate, nextDue, days };
   });

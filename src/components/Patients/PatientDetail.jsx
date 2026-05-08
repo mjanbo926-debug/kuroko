@@ -112,11 +112,16 @@ export default function PatientDetail() {
   const lastSixMonthReport = patientReports
     .filter(r => r.type === 'pt-sixmonth')[0];
   const lastReportDate = lastSixMonthReport?.createdAt?.split('T')[0] || null;
-  const nextDueDate = lastReportDate ? (() => {
-    const d = new Date(lastReportDate);
-    d.setMonth(d.getMonth() + 6);
-    return d;
-  })() : null;
+  // 手動設定 or 自動計算（前回+6ヶ月）
+  const nextDueDate = (() => {
+    if (patient.nextReportDueDate) return new Date(patient.nextReportDueDate);
+    if (lastReportDate) {
+      const d = new Date(lastReportDate);
+      d.setMonth(d.getMonth() + 6);
+      return d;
+    }
+    return null;
+  })();
   const daysUntilDue = nextDueDate
     ? Math.round((nextDueDate.getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24))
     : null;
@@ -347,45 +352,77 @@ export default function PatientDetail() {
             </div>
 
             {/* リマインダー（要フラグONの場合のみ） */}
-            {patient.requiresSixMonthReport !== false && (() => {
-              if (!lastReportDate) return (
-                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2">
-                  <AlertTriangle size={14} className="text-yellow-600 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-yellow-800">まだ作成記録がありません</p>
-                  </div>
+            {patient.requiresSixMonthReport !== false && (
+              <div className="space-y-2">
+                {/* 次回作成日の手動入力 */}
+                <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                  <label className="text-xs text-gray-500 shrink-0">次回作成日</label>
+                  <input
+                    type="date"
+                    value={patient.nextReportDueDate || ''}
+                    onChange={e => {
+                      const updated = patients.map(p =>
+                        p.id === patient.id ? { ...p, nextReportDueDate: e.target.value || undefined } : p
+                      );
+                      savePatients(updated);
+                    }}
+                    className="flex-1 px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                  {patient.nextReportDueDate && (
+                    <button
+                      onClick={() => {
+                        const updated = patients.map(p =>
+                          p.id === patient.id ? { ...p, nextReportDueDate: undefined } : p
+                        );
+                        savePatients(updated);
+                      }}
+                      className="text-gray-300 hover:text-red-400 transition-colors">
+                      <XCircle size={15} />
+                    </button>
+                  )}
                 </div>
-              );
-              const nextStr = `${nextDueDate.getFullYear()}/${nextDueDate.getMonth()+1}/${nextDueDate.getDate()}`;
-              const lastStr = lastReportDate.replace(/-/g, '/');
-              if (daysUntilDue < 0) return (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-                  <AlertTriangle size={14} className="text-red-600 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-red-700">{Math.abs(daysUntilDue)}日超過</p>
-                    <p className="text-xs text-red-400">前回：{lastStr}　次回期限：{nextStr}</p>
-                  </div>
-                </div>
-              );
-              if (daysUntilDue <= 30) return (
-                <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
-                  <Clock size={14} className="text-orange-600 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-orange-700">あと{daysUntilDue}日で作成期限</p>
-                    <p className="text-xs text-orange-400">前回：{lastStr}　次回期限：{nextStr}</p>
-                  </div>
-                </div>
-              );
-              return (
-                <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2">
-                  <Clock size={14} className="text-green-600 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-green-700">次回：{nextStr}（あと{daysUntilDue}日）</p>
-                    <p className="text-xs text-green-400">前回：{lastStr}</p>
-                  </div>
-                </div>
-              );
-            })()}
+
+                {/* 状態バッジ */}
+                {(() => {
+                  if (!nextDueDate && !lastReportDate) return (
+                    <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2">
+                      <AlertTriangle size={14} className="text-yellow-600 shrink-0" />
+                      <p className="text-xs font-semibold text-yellow-800">次回作成日を入力してください</p>
+                    </div>
+                  );
+                  if (!nextDueDate) return null;
+                  const nextStr = `${nextDueDate.getFullYear()}/${nextDueDate.getMonth()+1}/${nextDueDate.getDate()}`;
+                  const lastStr = lastReportDate?.replace(/-/g, '/');
+                  if (daysUntilDue < 0) return (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                      <AlertTriangle size={14} className="text-red-600 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-red-700">{Math.abs(daysUntilDue)}日超過　期限：{nextStr}</p>
+                        {lastStr && <p className="text-xs text-red-400">前回：{lastStr}</p>}
+                      </div>
+                    </div>
+                  );
+                  if (daysUntilDue <= 30) return (
+                    <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+                      <Clock size={14} className="text-orange-600 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-orange-700">あと{daysUntilDue}日　期限：{nextStr}</p>
+                        {lastStr && <p className="text-xs text-orange-400">前回：{lastStr}</p>}
+                      </div>
+                    </div>
+                  );
+                  return (
+                    <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2">
+                      <Clock size={14} className="text-green-600 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-green-700">次回：{nextStr}（あと{daysUntilDue}日）</p>
+                        {lastStr && <p className="text-xs text-green-400">前回：{lastStr}</p>}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         )}
 
