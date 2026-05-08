@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { ChevronLeft, ChevronRight, AlertTriangle, FileText, CheckCircle2, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 const VISIT_LIMIT = 16;
 
@@ -90,8 +90,6 @@ export default function MonthlyStats() {
     return { patient: p, lastDate, nextDue, days };
   });
 
-  // 期限30日以内 or 超過のみ警告表示
-  const urgentReminders = ptReportReminders.filter(r => r.days === null || r.days <= 30);
 
   return (
     <div className="space-y-4">
@@ -111,52 +109,6 @@ export default function MonthlyStats() {
               <span className="text-sm font-bold text-orange-600">{visitCountMap[p.id]}回</span>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* 副業先 施術報告書リマインダー（要注意のみ表示） */}
-      {urgentReminders.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-            <FileText size={16} className="text-emerald-600" />
-            <span className="text-sm font-semibold text-gray-700">副業先 施術報告書リマインダー</span>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {urgentReminders.map(({ patient, lastDate, nextDue, days }) => {
-              const isOverdue = days !== null && days < 0;
-              const isSoon = days !== null && days >= 0 && days <= 30;
-              const isNew = days === null;
-              return (
-                <div key={patient.id} className={`px-4 py-3 flex items-center justify-between gap-3 ${
-                  isOverdue ? 'bg-red-50/50' : isSoon ? 'bg-orange-50/50' : 'bg-yellow-50/50'}`}>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{patient.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {lastDate ? `前回：${formatDate(lastDate)}` : '未作成'}
-                      {nextDue && ` → 次回：${formatDate(nextDue.toISOString().split('T')[0])}`}
-                    </p>
-                  </div>
-                  <div className="shrink-0">
-                    {isOverdue && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 px-2.5 py-1 rounded-full">
-                        <AlertTriangle size={12} />{Math.abs(days)}日超過
-                      </span>
-                    )}
-                    {isSoon && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full">
-                        <Clock size={12} />あと{days}日
-                      </span>
-                    )}
-                    {isNew && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-yellow-700 bg-yellow-100 px-2.5 py-1 rounded-full">
-                        <FileText size={12} />未作成
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 
