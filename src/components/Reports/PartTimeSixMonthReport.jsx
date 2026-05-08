@@ -15,6 +15,7 @@ const REPORT_FIELDS = [
   ['longTermGoal', '長期目標', '長期的な施術目標を記入...', 2],
   ['shortTermGoal', '短期目標', '短期的な施術目標を記入...', 2],
   ['mentalCare', '声かけ・メンタルケア', '声かけやメンタルケアの内容を記入...', 2],
+  ['treatmentContent', '施術内容', '半年間の施術内容を記入...', 3],
   ['currentStatus', '現状', '現在の身体・生活状況を記入...', 3],
   ['futureApproach', '今後の取り組み', '今後の施術方針・取り組みを記入...', 2],
   ['specialNotes', '特記事項', '特記事項があれば記入...', 2],
@@ -30,7 +31,7 @@ export default function PartTimeSixMonthReport() {
     karteNo: '', recordDate: new Date().toISOString().split('T')[0],
     treatmentCount: '',
     initialStatus: '', longTermGoal: '', shortTermGoal: '',
-    mentalCare: '', currentStatus: '', futureApproach: '', specialNotes: '',
+    mentalCare: '', treatmentContent: '', currentStatus: '', futureApproach: '', specialNotes: '',
   });
   const [positionEntries, setPositionEntries] = useState([emptyPosition()]);
   const [corrected, setCorrected] = useState('');
@@ -138,6 +139,9 @@ ${posText || '記録なし'}
 
 ■ 声かけ・メンタルケア
 ${form.mentalCare}
+
+■ 施術内容
+${form.treatmentContent}
 
 ■ 現状
 ${form.currentStatus}
