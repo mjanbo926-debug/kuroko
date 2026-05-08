@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2, XCircle } from 'lucide-react';
+import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2, XCircle, AlertTriangle } from 'lucide-react';
 import { formatDate, REPORT_LABELS } from '../../utils/helpers';
 
 const ADL_LABELS = [
@@ -107,6 +107,19 @@ export default function PatientDetail() {
 
   const todayStr = new Date().toISOString().split('T')[0];
   const hasTodayReport = dailyReports.some(r => r.date === todayStr);
+
+  // 副業先：施術報告書リマインダー計算
+  const lastSixMonthReport = patientReports
+    .filter(r => r.type === 'pt-sixmonth')[0];
+  const lastReportDate = lastSixMonthReport?.createdAt?.split('T')[0] || null;
+  const nextDueDate = lastReportDate ? (() => {
+    const d = new Date(lastReportDate);
+    d.setMonth(d.getMonth() + 6);
+    return d;
+  })() : null;
+  const daysUntilDue = nextDueDate
+    ? Math.round((nextDueDate.getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24))
+    : null;
 
   const reportButtons = patient.type === 'fullTime'
     ? [
@@ -307,28 +320,72 @@ export default function PatientDetail() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <h3 className="text-sm font-semibold text-gray-600 mb-3">報告書作成</h3>
 
-        {/* 副業先：施術報告書の要否設定 */}
+        {/* 副業先：施術報告書の要否設定＋リマインダー */}
         {patient.type === 'partTime' && (
-          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5 mb-3">
-            <div>
-              <p className="text-sm font-medium text-gray-700">施術報告書（半年毎）が必要</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {patient.requiresSixMonthReport === false ? '不要（複数名担当など）' : '必要（担当者として作成）'}
-              </p>
+          <div className="space-y-2 mb-3">
+            {/* 要否トグル */}
+            <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium text-gray-700">施術報告書（半年毎）が必要</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {patient.requiresSixMonthReport === false ? '不要（複数名担当など）' : '必要（担当者として作成）'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const current = patient.requiresSixMonthReport !== false;
+                  const updated = patients.map(p =>
+                    p.id === patient.id ? { ...p, requiresSixMonthReport: !current } : p
+                  );
+                  savePatients(updated);
+                }}
+                className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${
+                  patient.requiresSixMonthReport !== false ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                  patient.requiresSixMonthReport !== false ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </button>
             </div>
-            <button
-              onClick={() => {
-                const current = patient.requiresSixMonthReport !== false;
-                const updated = patients.map(p =>
-                  p.id === patient.id ? { ...p, requiresSixMonthReport: !current } : p
-                );
-                savePatients(updated);
-              }}
-              className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${
-                patient.requiresSixMonthReport !== false ? 'bg-emerald-500' : 'bg-gray-300'}`}>
-              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                patient.requiresSixMonthReport !== false ? 'translate-x-6' : 'translate-x-0.5'}`} />
-            </button>
+
+            {/* リマインダー（要フラグONの場合のみ） */}
+            {patient.requiresSixMonthReport !== false && (() => {
+              if (!lastReportDate) return (
+                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2">
+                  <AlertTriangle size={14} className="text-yellow-600 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-yellow-800">まだ作成記録がありません</p>
+                  </div>
+                </div>
+              );
+              const nextStr = `${nextDueDate.getFullYear()}/${nextDueDate.getMonth()+1}/${nextDueDate.getDate()}`;
+              const lastStr = lastReportDate.replace(/-/g, '/');
+              if (daysUntilDue < 0) return (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                  <AlertTriangle size={14} className="text-red-600 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-red-700">{Math.abs(daysUntilDue)}日超過</p>
+                    <p className="text-xs text-red-400">前回：{lastStr}　次回期限：{nextStr}</p>
+                  </div>
+                </div>
+              );
+              if (daysUntilDue <= 30) return (
+                <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+                  <Clock size={14} className="text-orange-600 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-orange-700">あと{daysUntilDue}日で作成期限</p>
+                    <p className="text-xs text-orange-400">前回：{lastStr}　次回期限：{nextStr}</p>
+                  </div>
+                </div>
+              );
+              return (
+                <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2">
+                  <Clock size={14} className="text-green-600 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-green-700">次回：{nextStr}（あと{daysUntilDue}日）</p>
+                    <p className="text-xs text-green-400">前回：{lastStr}</p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
