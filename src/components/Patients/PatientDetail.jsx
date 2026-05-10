@@ -18,6 +18,7 @@ export default function PatientDetail() {
   const [reportHistoryOpen, setReportHistoryOpen] = useState(false);
   const [dailyHistoryOpen, setDailyHistoryOpen] = useState(false);
   const [statusNote, setStatusNote] = useState('');
+  const [treatmentTemplate, setTreatmentTemplate] = useState(null); // nullは未編集を示す
   const [newSpotDate, setNewSpotDate] = useState('');
   const [newSpotTime, setNewSpotTime] = useState('');
   const [newAbsentDate, setNewAbsentDate] = useState('');
@@ -324,6 +325,34 @@ export default function PatientDetail() {
       {/* 報告書作成 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <h3 className="text-sm font-semibold text-gray-600 mb-3">報告書作成</h3>
+
+        {/* 正社員先：施術内容テンプレート */}
+        {patient.type === 'fullTime' && (
+          <div className="mb-3 space-y-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">施術内容テンプレート（月次報告書に自動入力）</label>
+              <textarea
+                value={treatmentTemplate !== null ? treatmentTemplate : (patient.treatmentTemplate || '')}
+                onChange={e => setTreatmentTemplate(e.target.value)}
+                rows={4}
+                placeholder="例：頸肩部・下肢のマッサージを行い筋緊張や疼痛の緩和、血流循環の改善を図っています。マッサージ後、ストレッチや関節可動域訓練を行い柔軟性の改善と関節拘縮の予防・可動域の改善に取り組んでいます。"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none text-gray-800"
+              />
+            </div>
+            <button
+              onClick={() => {
+                const val = treatmentTemplate !== null ? treatmentTemplate : (patient.treatmentTemplate || '');
+                const updated = patients.map(p =>
+                  p.id === patient.id ? { ...p, treatmentTemplate: val } : p
+                );
+                savePatients(updated);
+                setTreatmentTemplate(null);
+              }}
+              className="w-full py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
+              テンプレートを保存
+            </button>
+          </div>
+        )}
 
         {/* 副業先：施術報告書の要否設定＋リマインダー */}
         {patient.type === 'partTime' && (

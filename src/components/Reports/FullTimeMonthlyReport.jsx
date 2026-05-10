@@ -23,7 +23,9 @@ export default function FullTimeMonthlyReport() {
   const [year, setYear] = useState(cy);
   const [month, setMonth] = useState(cm);
   const [sections, setSections] = useState({
-    healthCondition: '', physicalCondition: '', treatmentContent: '', lifeObservations: '',
+    healthCondition: '', physicalCondition: '',
+    treatmentContent: p.treatmentTemplate || '',
+    lifeObservations: '',
   });
   const [corrected, setCorrected] = useState('');
   const [loading, setLoading] = useState(false);
@@ -178,6 +180,11 @@ export default function FullTimeMonthlyReport() {
               className={ta()} rows={key === 'physicalCondition' ? 3 : 4} placeholder={placeholder} />
           </Field>
         ))}
+        {p.treatmentTemplate && (
+          <div className="text-xs text-blue-600 bg-blue-50 rounded-xl px-3 py-2 border border-blue-100">
+            💡 施術内容にテンプレートを自動入力しました（患者情報で変更可）
+          </div>
+        )}
         <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-400 border border-gray-100">
           締め文（固定）：{CLOSING}
         </div>
