@@ -3,7 +3,7 @@ import { useApp } from '../../App';
 import { correctText, summarizePatientDailyReports } from '../../utils/anthropic';
 import { generatePartTimeSixMonthExcel } from '../../utils/excel';
 import { generateId } from '../../utils/helpers';
-import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check, Plus, X, Clock, AlertTriangle } from 'lucide-react';
+import { Sparkles, Loader2, FileDown, Save, NotebookText, ChevronDown, ChevronUp, Check, Plus, X, Clock, AlertTriangle, History } from 'lucide-react';
 import ReportAIGenerator from './ReportAIGenerator';
 
 const POSITIONS = ['仰臥位', '右側臥位', '左側臥位', '腹臥位', '座位', '立位'];
@@ -40,6 +40,9 @@ export default function PartTimeSixMonthReport() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null); // 編集中の既存レポートID
+  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]); // 作成日
 
   const set = (key, val) => { setForm(f => ({ ...f, [key]: val })); setSaved(false); };
 
@@ -191,20 +194,100 @@ ${form.specialNotes}`;
     : null;
 
   const handleSave = () => {
+    const createdAt = new Date(reportDate + 'T00:00:00').toISOString();
     const report = {
-      id: generateId(), patientId: p.id, type: 'pt-sixmonth',
-      form, positionEntries, correctedText: corrected, createdAt: new Date().toISOString(),
+      id: editingId || generateId(),
+      patientId: p.id, type: 'pt-sixmonth',
+      form, positionEntries, correctedText: corrected, createdAt,
     };
-    saveReports([...reports, report]);
+    const updated = editingId
+      ? reports.map(r => r.id === editingId ? report : r)
+      : [...reports, report];
+    saveReports(updated);
+    setEditingId(report.id);
     setSaved(true);
   };
 
+  const loadHistory = (r) => {
+    setForm(r.form || {});
+    setPositionEntries(r.positionEntries || [emptyPosition()]);
+    setCorrected(r.correctedText || '');
+    setReportDate(r.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0]);
+    setEditingId(r.id);
+    setSaved(true);
+    setHistoryOpen(false);
+  };
+
+  const handleNew = () => {
+    setForm({
+      karteNo: '', recordDate: new Date().toISOString().split('T')[0],
+      treatmentCount: '',
+      initialStatus: '', longTermGoal: '', shortTermGoal: '',
+      mentalCare: '', treatmentContent: '', currentStatus: '', futureApproach: '', specialNotes: '',
+    });
+    setPositionEntries([emptyPosition()]);
+    setCorrected('');
+    setReportDate(new Date().toISOString().split('T')[0]);
+    setEditingId(null);
+    setSaved(false);
+  };
+
+  // この患者の報告書履歴
+  const reportHistory = (reports || [])
+    .filter(r => r.patientId === p.id && r.type === 'pt-sixmonth')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-gray-800">施術報告書</h2>
-        <p className="text-sm text-gray-500 mt-0.5">副業先・半年毎 — Excel出力</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">施術報告書</h2>
+          <p className="text-sm text-gray-500 mt-0.5">副業先・半年毎 — Excel出力
+            {editingId && <span className="ml-2 text-xs text-blue-600">編集中</span>}
+          </p>
+        </div>
+        <button onClick={handleNew}
+          className="shrink-0 text-xs px-3 py-2 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+          ＋ 新規作成
+        </button>
       </div>
+
+      {/* 過去の報告書履歴 */}
+      {reportHistory.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <button className="w-full flex items-center justify-between px-4 py-3"
+            onClick={() => setHistoryOpen(!historyOpen)}>
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <History size={16} className="text-gray-400" />過去の施術報告書（{reportHistory.length}件）
+            </div>
+            {historyOpen ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+          </button>
+          {historyOpen && (
+            <div className="border-t border-gray-100 divide-y divide-gray-50">
+              {reportHistory.map(r => {
+                const d = r.createdAt?.split('T')[0]?.replace(/-/g, '/') || '不明';
+                const isEditing = r.id === editingId;
+                return (
+                  <button key={r.id} onClick={() => loadHistory(r)}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                      isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{d}作成分</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        対象期間：{r.form?.recordDate?.replace(/-/g, '/') || '—'}まで
+                        {r.form?.treatmentCount && `　施術${r.form.treatmentCount}回`}
+                      </p>
+                    </div>
+                    {isEditing
+                      ? <span className="text-xs text-blue-600 font-medium">編集中</span>
+                      : <span className="text-xs text-gray-400">読み込む</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 次回作成リマインダー（要フラグが立っている場合のみ） */}
       {p.requiresSixMonthReport !== false && (() => {
@@ -261,6 +344,10 @@ ${form.specialNotes}`;
         <Field label="施術回数">
           <input type="number" value={form.treatmentCount} onChange={e => set('treatmentCount', e.target.value)}
             className={inp()} placeholder="例：24" />
+        </Field>
+        <Field label="報告書作成日">
+          <input type="date" value={reportDate} onChange={e => { setReportDate(e.target.value); setSaved(false); }}
+            className={inp()} />
         </Field>
         <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-700 space-y-1">
           <p><b>患者名：</b>{p.name}　<b>住所：</b>{p.address}</p>
