@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
 import { correctMonthlyReport, summarizeMonthlyReport } from '../../utils/anthropic';
-import { generateId, getCurrentYearMonth, REPORT_LABELS } from '../../utils/helpers';
+import { generateId, getCurrentYearMonth } from '../../utils/helpers';
 import CopyButton from '../Common/CopyButton';
 import ReportAIGenerator from './ReportAIGenerator';
-import { Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Loader2, ChevronDown, ChevronUp, History } from 'lucide-react';
 
 const SECTIONS = [
-  ['healthCondition', '① 体調・生活状況', '体調や日常生活の様子を記入...'],
-  ['physicalCondition', '② 身体状況（疼痛・可動域・筋緊張など）', '疼痛・可動域・筋緊張の状態を記入...'],
-  ['treatmentContent', '③ 施術内容', '今月実施した施術内容を記入...'],
-  ['treatmentResponse', '④ 施術中・施術後の反応', '施術中・後の反応を記入...'],
-  ['lifeObservations', '⑤ 生活面での気になる点・連携事項', '生活面で気になった点、他職種への連携事項を記入...'],
-  ['futurePolicy', '⑥ 今後の対応方針', '今後の施術方針・目標を記入...'],
+  ['healthCondition', '体調', '体調や日常生活の様子を記入...'],
+  ['physicalCondition', '身体の様子', '筋力低下・疼痛など（改行区切りで）...'],
+  ['treatmentContent', '施術内容', '今月実施した施術内容を記入...'],
+  ['lifeObservations', '気になる事', '生活面で気になった点を記入...'],
 ];
+
+const CLOSING = '引き続き施術を行い、症状や運動機能の改善を目指します。';
 
 export default function FullTimeMonthlyReport() {
   const { selectedPatient, reports, saveReports, dailyReports, settings } = useApp();
@@ -23,14 +23,14 @@ export default function FullTimeMonthlyReport() {
   const [year, setYear] = useState(cy);
   const [month, setMonth] = useState(cm);
   const [sections, setSections] = useState({
-    healthCondition: '', physicalCondition: '', treatmentContent: '',
-    treatmentResponse: '', lifeObservations: '', futurePolicy: '',
+    healthCondition: '', physicalCondition: '', treatmentContent: '', lifeObservations: '',
   });
   const [corrected, setCorrected] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
 
   const history = reports
     .filter(r => r.patientId === p.id && r.type === 'ft-monthly')
@@ -38,15 +38,16 @@ export default function FullTimeMonthlyReport() {
 
   const set = (key, val) => setSections(s => ({ ...s, [key]: val }));
 
-  const [summarizing, setSummarizing] = useState(false);
-
-  const handleAutoFill = async () => {
+  const getMonthReports = () => {
     const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-    const monthReports = (dailyReports || [])
+    return (dailyReports || [])
       .filter(r => r.date.startsWith(monthStr))
       .map(r => ({ date: r.date, ...(r.visits || []).find(v => v.patientId === p.id && v.visited) }))
       .filter(r => r.patientId);
+  };
 
+  const handleAutoFill = async () => {
+    const monthReports = getMonthReports();
     if (monthReports.length === 0) {
       alert('この月の日報が見つかりません。先に日報を入力してください。');
       return;
@@ -63,9 +64,7 @@ export default function FullTimeMonthlyReport() {
         healthCondition: result.healthCondition || '',
         physicalCondition: result.physicalCondition || '',
         treatmentContent: result.treatmentContent || '',
-        treatmentResponse: result.treatmentResponse || '',
         lifeObservations: result.lifeObservations || '',
-        futurePolicy: result.futurePolicy || '',
       });
       setCorrected('');
       setSaved(false);
@@ -78,8 +77,12 @@ export default function FullTimeMonthlyReport() {
 
   const buildText = (data) => {
     const s = data || sections;
-    return `【月次報告書】${p.name}様　${year}年${month}月分\n\n` +
-      SECTIONS.map(([key, label]) => `${label}\n${s[key] || ''}`).join('\n\n');
+    return `${p.name}様\n\n` +
+      `『${month}月の体調』\n${s.healthCondition || ''}\n\n` +
+      `『身体の様子』\n${s.physicalCondition || ''}\n\n` +
+      `『施術内容』\n${s.treatmentContent || ''}\n\n` +
+      `『気になる事』\n${s.lifeObservations || ''}\n\n` +
+      CLOSING;
   };
 
   const handleCorrect = async () => {
@@ -87,7 +90,8 @@ export default function FullTimeMonthlyReport() {
     setLoading(true);
     try {
       const result = await correctMonthlyReport(sections, settings.apiKey);
-      setCorrected(`【月次報告書】${p.name}様　${year}年${month}月分\n\n` + result);
+      // 添削結果に患者名・締め文を付加して完成文にする
+      setCorrected(`${p.name}様\n\n${result}\n\n${CLOSING}`);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -111,6 +115,12 @@ export default function FullTimeMonthlyReport() {
     setCorrected(r.correctedText || '');
     setSaved(true);
     setHistoryOpen(false);
+  };
+
+  const handleAutoFillFromAI = (aiText) => {
+    // AIストリーミング生成結果をプレビューとして corrected にセット
+    setCorrected(aiText);
+    setSaved(false);
   };
 
   const outputText = corrected || buildText();
@@ -144,11 +154,7 @@ export default function FullTimeMonthlyReport() {
 
       {/* AI報告書生成 */}
       {(() => {
-        const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-        const monthReports = (dailyReports || [])
-          .filter(r => r.date.startsWith(monthStr))
-          .map(r => ({ date: r.date, ...(r.visits || []).find(v => v.patientId === p.id && v.visited) }))
-          .filter(r => r.patientId);
+        const monthReports = getMonthReports();
         return (
           <ReportAIGenerator
             patient={p}
@@ -156,7 +162,7 @@ export default function FullTimeMonthlyReport() {
             period={`${year}年${month}月`}
             reportType="monthly"
             apiKey={settings.apiKey}
-            onAutoFill={() => handleAutoFill()}
+            onAutoFill={handleAutoFillFromAI}
           />
         );
       })()}
@@ -169,9 +175,12 @@ export default function FullTimeMonthlyReport() {
         {SECTIONS.map(([key, label, placeholder]) => (
           <Field key={key} label={label}>
             <textarea value={sections[key]} onChange={e => set(key, e.target.value)}
-              className={ta()} rows={3} placeholder={placeholder} />
+              className={ta()} rows={key === 'physicalCondition' ? 3 : 4} placeholder={placeholder} />
           </Field>
         ))}
+        <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-400 border border-gray-100">
+          締め文（固定）：{CLOSING}
+        </div>
       </Card>
 
       <button onClick={handleCorrect} disabled={loading}

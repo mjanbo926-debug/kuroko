@@ -46,44 +46,54 @@ ${text}`;
 }
 
 export async function correctMonthlyReport(sections, apiKey) {
-  const text = `① 体調・生活状況\n${sections.healthCondition || ''}\n\n② 身体状況（疼痛・可動域・筋緊張など）\n${sections.physicalCondition || ''}\n\n③ 施術内容\n${sections.treatmentContent || ''}\n\n④ 施術中・施術後の反応\n${sections.treatmentResponse || ''}\n\n⑤ 生活面での気になる点・連携事項\n${sections.lifeObservations || ''}\n\n⑥ 今後の対応方針\n${sections.futurePolicy || ''}`;
+  const text = `『体調』\n${sections.healthCondition || ''}\n\n『身体の様子』\n${sections.physicalCondition || ''}\n\n『施術内容』\n${sections.treatmentContent || ''}\n\n『気になる事』\n${sections.lifeObservations || ''}`;
 
-  const prompt = `以下は訪問マッサージの月次報告書の下書きです。医師・ケアマネジャー・介護事業所に提出できる正式な文体に添削してください。
+  const prompt = `以下は訪問マッサージの月次報告書（会社LINE報告用）の下書きです。以下の指示に従って添削してください。
 
 【添削の注意点】
-- 各項目の番号と見出し（①〜⑥）はそのまま保持すること
-- 箇条書きは文章形式に変換すること
-- 記録が「記録なし」「なし」「空白」の項目は「今月は特記事項はございませんでした。」などと補完すること
-- 全体を通じて一貫した敬体・観察表現で統一すること
+- 各項目の見出し（『体調』『身体の様子』『施術内容』『気になる事』）はそのまま保持すること
+- 『身体の様子』は簡潔な名詞・体言止めのリスト形式を維持すること（例：筋力低下（廃用症候群）、頸肩部の筋緊張）
+- 『体調』『施術内容』『気になる事』は文章形式（です・ます調）で記述すること
+- 記録が空白の項目は「今月は特記事項はございませんでした。」などと補完すること
+- 末尾の締め文は出力しないこと（呼び出し側で固定文を付加する）
 
 ${text}`;
 
   const data = await callApi([{ role: 'user', content: prompt }], apiKey);
-  return data.content[0].text;
+  // buildText側で整形するため生テキストを返す
+  const raw = data.content[0].text.trim();
+  return raw;
 }
 
 export async function summarizeMonthlyReport(patientName, year, month, dailyReportList, apiKey) {
   const reportsText = dailyReportList
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(r =>
-      `【${r.date}】\n体調・生活状況：${r.condition || '記録なし'}\n施術内容：${r.notes || '記録なし'}\nADL変化・気になる点：${r.adlNotes || '記録なし'}\n特記事項：${r.specialNotes || 'なし'}`
-    ).join('\n\n---\n\n');
+    .map(r => {
+      const lines = [];
+      if (r.bodyParts?.length) lines.push(`部位：${r.bodyParts.join('・')}`);
+      if (r.treatmentTags?.length) lines.push(`施術：${r.treatmentTags.join('・')}`);
+      if (r.patientCondition) lines.push(`状態：${r.patientCondition}`);
+      if (r.condition) lines.push(`体調：${r.condition}`);
+      if (r.notes) lines.push(`メモ：${r.notes}`);
+      if (r.adlNotes) lines.push(`ADL：${r.adlNotes}`);
+      if (r.specialNotes) lines.push(`特記：${r.specialNotes}`);
+      return `【${r.date}】\n${lines.join('\n') || '（記録なし）'}`;
+    }).join('\n\n---\n\n');
 
   const prompt = `以下は${patientName}様の${year}年${month}月分の施術日報（${dailyReportList.length}回分）です。
-これをもとに、医師・ケアマネジャー・介護事業所に提出する月次報告書の各項目を1ヶ月分としてまとめてください。
+これをもとに、会社に報告する月次報告書の各項目をまとめてください。
 
-【作成の注意点】
-- 日報の内容を要約・統合し、当月全体の傾向・状態を報告書として記述すること
-- 箇条書きは使わず、文章形式（〜がみられます。〜の傾向がうかがえます。）で記述すること
-- 観察・所見ベースの表現を使い、断定表現は避けること
-- 各項目は2〜3文程度にまとめること
-- 記録が少ない項目は「今月は特記事項はございませんでした。」などと記述すること
+【各項目の書き方】
+- healthCondition（体調）：当月の体調や生活状況の変化を2〜3文で文章形式（です・ます調）で記述
+- physicalCondition（身体の様子）：主な身体症状・問題点を簡潔な名詞・体言止めのリスト形式で列挙（例：筋力低下（廃用症候群）\n頸肩部の筋緊張）改行区切りで箇条書き風に
+- treatmentContent（施術内容）：実施した施術内容を2〜4文で文章形式で記述
+- lifeObservations（気になる事）：生活面・身体面で気になった点・注意事項を1〜3文で文章形式で記述。特になければ空文字
 
 【日報データ】
 ${reportsText}
 
 以下のJSON形式のみで出力してください（コードブロック・説明文不要）:
-{"healthCondition":"体調・生活状況","physicalCondition":"身体状況（疼痛・可動域・筋緊張など）","treatmentContent":"施術内容","treatmentResponse":"施術中・施術後の反応","lifeObservations":"生活面での気になる点・連携事項","futurePolicy":"今後の対応方針"}`;
+{"healthCondition":"体調の文章","physicalCondition":"症状リスト（改行区切り）","treatmentContent":"施術内容の文章","lifeObservations":"気になる事の文章"}`;
 
   const data = await callApi([{ role: 'user', content: prompt }], apiKey);
   const text = data.content[0].text.trim();
@@ -125,14 +135,23 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
     }).join('\n\n');
 
   const formatSection = reportType === 'monthly'
-    ? `以下の6項目の見出しをそのまま使い、各項目を2〜3文で記述してください：
+    ? `以下の4項目の見出しをそのまま使い、会社LINE報告用の月次報告書を作成してください：
 
-① 体調・生活状況
-② 身体状況（疼痛・可動域・筋緊張など）
-③ 施術内容
-④ 施術中・施術後の反応
-⑤ 生活面での気になる点・連携事項
-⑥ 今後の対応方針`
+『体調』
+（当月の体調・生活状況の変化を2〜3文で文章形式で）
+
+『身体の様子』
+（主な症状・問題点を名詞・体言止めで改行区切りのリスト形式で。例：筋力低下（廃用症候群）
+頸肩部の筋緊張
+下肢の疼痛）
+
+『施術内容』
+（実施した施術内容を2〜4文で文章形式で）
+
+『気になる事』
+（生活面・身体面の気になる点・注意事項を1〜3文で。なければ「今月は特記事項はございませんでした。」）
+
+※末尾の締め文は出力しないこと（固定文を別途付加する）`
     : `以下の項目の見出しをそのまま使い、各項目を2〜3文で記述してください：
 
 ■ 施術開始時の状況
