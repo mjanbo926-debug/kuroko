@@ -24,16 +24,30 @@ function formatDateJP(dateStr) {
 function getPatientsForDate(patients, dateStr, overrides) {
   const dayLabel = getDayLabel(dateStr);
   const ov = (overrides || {})[dateStr] || {};
+
+  // 通常患者（スポット以外）
   const normally = patients.filter(p =>
     !p.terminated &&
+    p.visitSchedule !== 'spot' &&
     (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel)
   );
   const afterRemoval = normally.filter(p => !(ov.removed || []).includes(p.id));
+
+  // スポット患者：spotDatesにこの日がある
+  const spotPatients = patients.filter(p =>
+    !p.terminated &&
+    p.visitSchedule === 'spot' &&
+    (p.spotDates || []).some(s => (s.date || s) === dateStr) &&
+    !(ov.removed || []).includes(p.id)
+  );
+
+  // 手動追加（overrides.added）
   const added = (ov.added || [])
     .map(id => patients.find(p => p.id === id))
     .filter(Boolean)
-    .filter(p => !afterRemoval.find(n => n.id === p.id));
-  return [...afterRemoval, ...added];
+    .filter(p => !afterRemoval.find(n => n.id === p.id) && !spotPatients.find(n => n.id === p.id));
+
+  return [...afterRemoval, ...spotPatients, ...added];
 }
 
 export default function DailyReport() {
@@ -188,6 +202,9 @@ export default function DailyReport() {
                         patient.type === 'fullTime' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                         {patient.type === 'fullTime' ? '正' : '副'}
                       </span>
+                      {patient.visitSchedule === 'spot' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">スポット</span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap">
                       {patient.visitTime && <span>{patient.visitTime}</span>}
