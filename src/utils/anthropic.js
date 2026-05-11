@@ -102,7 +102,7 @@ ${reportsText}
   return JSON.parse(match[0]);
 }
 
-export async function streamGenerateReport({ patientName, period, dailyReportList, reportType }, apiKey, onChunk) {
+export async function streamGenerateReport({ patientName, period, dailyReportList, reportType, experienceReport, pastReports }, apiKey, onChunk) {
   if (!apiKey) throw new Error('APIキーが設定されていません。設定画面でAnthropicのAPIキーを入力してください。');
 
   const count = dailyReportList.length;
@@ -161,9 +161,25 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
 ■ 今後の取り組み
 ■ 特記事項`;
 
+  // 副業先半年報告書用：体験カルテ・過去報告書コンテキスト
+  let additionalContext = '';
+  if (reportType === 'sixmonth') {
+    if (experienceReport) {
+      const ef = experienceReport.form || {};
+      additionalContext += `\n【初回体験カルテ（施術開始時の情報）】\n主訴：${ef.chiefComplaint || ''}\n初回施術内容：${ef.initialTreatment || ''}\n施術目標：${ef.treatmentGoal || ''}\n現在の状況（体験時）：${ef.currentStatus || ''}\n計画目標：${ef.planGoal || ''}\n計画施術内容：${ef.planTreatment || ''}\nコミュニケーション面：${ef.communicationNotes || ''}`;
+    }
+    if (pastReports?.length > 0) {
+      additionalContext += '\n\n【過去の施術報告書（参考）】\n' + pastReports.slice(0, 2).map(r => {
+        const f = r.form || {};
+        const date = r.createdAt?.split('T')[0]?.replace(/-/g, '/') || '';
+        return `◆ ${date}作成分\n施術開始時の状況：${f.initialStatus || ''}\n長期目標：${f.longTermGoal || ''}\n短期目標：${f.shortTermGoal || ''}\n現状：${f.currentStatus || ''}\n今後の取り組み：${f.futureApproach || ''}`;
+      }).join('\n\n');
+    }
+  }
+
   const typeLabel = reportType === 'monthly' ? '月次' : '半年次';
   const prompt = `以下は${patientName}様の${period}の施術記録です（${count}回分）。
-これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書を作成してください。
+これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書を作成してください。${additionalContext}
 
 【施術サマリー】
 - 施術回数：${count}回${topParts.length ? `\n- 主な施術部位：${topParts.join('・')}` : ''}${topTreats.length ? `\n- 主な施術内容：${topTreats.join('・')}` : ''}${topCondition ? `\n- 全体的な状態傾向：${topCondition}` : ''}
@@ -180,7 +196,8 @@ ${formatSection}
 - 医学的断定・治療効果の断定は避ける
 - 箇条書きは使わず文章形式で
 - 各項目の見出しの後に改行して本文を記述すること
-- 余分な前置き・後書き・説明は不要`;
+- 余分な前置き・後書き・説明は不要
+${reportType === 'sixmonth' && additionalContext ? '- 体験カルテの主訴・目標と現在の状況を比較し変化・進捗を反映すること\n- 過去の報告書がある場合は前回との変化・継続点を意識して記述すること' : ''}`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -228,18 +245,54 @@ ${formatSection}
   return fullText;
 }
 
-export async function summarizePatientDailyReports(patientName, dailyReportList, apiKey) {
+export async function summarizePatientDailyReports(patientName, dailyReportList, apiKey, experienceReport = null, pastReports = []) {
   const reportsText = dailyReportList
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(r =>
-      `【${r.date}】\n体調・生活状況：${r.condition || '記録なし'}\n施術内容：${r.treatment || r.notes || '記録なし'}\nADL変化・気になる点：${r.adlNotes || '記録なし'}\n特記事項：${r.specialNotes || 'なし'}`
-    ).join('\n\n---\n\n');
+    .map(r => {
+      const lines = [];
+      if (r.bodyParts?.length) lines.push(`部位：${r.bodyParts.join('・')}`);
+      if (r.treatmentTags?.length) lines.push(`施術：${r.treatmentTags.join('・')}`);
+      if (r.patientCondition) lines.push(`状態：${r.patientCondition}`);
+      if (r.condition) lines.push(`体調：${r.condition}`);
+      if (r.treatment || r.notes) lines.push(`メモ：${r.treatment || r.notes}`);
+      if (r.adlNotes) lines.push(`ADL：${r.adlNotes}`);
+      if (r.specialNotes) lines.push(`特記：${r.specialNotes}`);
+      return `【${r.date}】\n${lines.join('\n') || '（記録なし）'}`;
+    }).join('\n\n---\n\n');
+
+  // 体験カルテのコンテキスト
+  let karteContext = '';
+  if (experienceReport) {
+    const ef = experienceReport.form || {};
+    karteContext = `
+【初回体験カルテ（施術開始時の情報）】
+主訴：${ef.chiefComplaint || ''}
+初回施術内容：${ef.initialTreatment || ''}
+施術目標：${ef.treatmentGoal || ''}
+現在の状況（体験時）：${ef.currentStatus || ''}
+計画目標：${ef.planGoal || ''}
+計画施術内容：${ef.planTreatment || ''}
+コミュニケーション面：${ef.communicationNotes || ''}`;
+  }
+
+  // 過去の施術報告書コンテキスト（最新2件）
+  let pastContext = '';
+  if (pastReports.length > 0) {
+    pastContext = '\n\n【過去の施術報告書（参考）】\n' + pastReports.slice(0, 2).map(r => {
+      const f = r.form || {};
+      const date = r.createdAt?.split('T')[0]?.replace(/-/g, '/') || '';
+      return `◆ ${date}作成分\n施術開始時の状況：${f.initialStatus || ''}\n長期目標：${f.longTermGoal || ''}\n短期目標：${f.shortTermGoal || ''}\n現状：${f.currentStatus || ''}\n今後の取り組み：${f.futureApproach || ''}`;
+    }).join('\n\n');
+  }
 
   const prompt = `以下は${patientName}様の施術日報（${dailyReportList.length}回分）です。
-これらをもとに、医師・ケアマネジャー・介護事業所に提出する半年施術報告書の各項目を作成してください。
+体験カルテ・過去の報告書・日報をすべて参照して、医師・ケアマネジャー・介護事業所に提出する半年施術報告書の各項目を作成してください。
+${karteContext}${pastContext}
 
 【作成の注意点】
 - 日報の内容を要約・統合し、期間全体の傾向・変化を報告書として記述すること
+- 体験カルテの主訴・目標と現在の状況を比較し、変化・進捗を反映すること
+- 過去の報告書がある場合は、前回との変化・継続点を意識して記述すること
 - 箇条書きは使わず、文章形式（〜がみられます。〜の傾向がうかがえます。）で記述すること
 - 観察・所見ベースの表現を使い、断定表現は避けること
 - 各項目は2〜4文程度でまとめること

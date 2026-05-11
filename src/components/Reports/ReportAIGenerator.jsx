@@ -3,7 +3,7 @@ import { streamGenerateReport } from '../../utils/anthropic';
 import { Sparkles, Loader2, RotateCcw, ClipboardCheck, FileInput } from 'lucide-react';
 import CopyButton from '../Common/CopyButton';
 
-export default function ReportAIGenerator({ patient, dailyReportList, period, reportType, apiKey, onAutoFill }) {
+export default function ReportAIGenerator({ patient, dailyReportList, period, reportType, apiKey, onAutoFill, experienceReport, pastReports }) {
   const [generating, setGenerating] = useState(false);
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ export default function ReportAIGenerator({ patient, dailyReportList, period, re
     setError('');
     try {
       await streamGenerateReport(
-        { patientName: patient.name, period, dailyReportList, reportType },
+        { patientName: patient.name, period, dailyReportList, reportType, experienceReport, pastReports },
         apiKey,
         (chunk) => setOutput(prev => prev + chunk),
       );
@@ -40,7 +40,9 @@ export default function ReportAIGenerator({ patient, dailyReportList, period, re
             </div>
             <p className="text-xs text-gray-400 mt-0.5">
               {count > 0
-                ? `日報 ${count}件 → ${reportType === 'monthly' ? '『体調』『身体の様子』『施術内容』『気になる事』で生成' : '■項目の半年次フォーマットで生成'}`
+                ? `日報 ${count}件 → ${reportType === 'monthly'
+                    ? '『体調』『身体の様子』『施術内容』『気になる事』で生成'
+                    : `■項目の半年次フォーマットで生成${experienceReport ? '・体験カルテ参照' : ''}${pastReports?.length ? `・過去報告書${pastReports.length}件参照` : ''}`}`
                 : '対象期間内の日報がありません'}
             </p>
           </div>

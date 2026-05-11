@@ -14,8 +14,8 @@ const REPORT_FIELDS = [
   ['initialStatus', '施術開始時の状況', '施術開始時の身体・生活状況を記入...', 3],
   ['longTermGoal', '長期目標', '長期的な施術目標を記入...', 2],
   ['shortTermGoal', '短期目標', '短期的な施術目標を記入...', 2],
-  ['mentalCare', '声かけ・メンタルケア', '声かけやメンタルケアの内容を記入...', 2],
   ['treatmentContent', '施術内容', '半年間の施術内容を記入...', 3],
+  ['mentalCare', '声かけ・メンタルケア', '声かけやメンタルケアの内容を記入...', 2],
   ['currentStatus', '現状', '現在の身体・生活状況を記入...', 3],
   ['futureApproach', '今後の取り組み', '今後の施術方針・取り組みを記入...', 2],
   ['specialNotes', '特記事項', '特記事項があれば記入...', 2],
@@ -113,7 +113,7 @@ export default function PartTimeSixMonthReport() {
     }
     setSummarizing(true);
     try {
-      const result = await summarizePatientDailyReports(p.name, periodReports, settings.apiKey);
+      const result = await summarizePatientDailyReports(p.name, periodReports, settings.apiKey, experienceReport, pastSixMonthReports);
       setForm(f => ({
         ...f,
         initialStatus: result.initialStatus || f.initialStatus,
@@ -236,6 +236,14 @@ ${form.specialNotes}`;
   const reportHistory = (reports || [])
     .filter(r => r.patientId === p.id && r.type === 'pt-sixmonth')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  // 体験カルテ（最新1件）
+  const experienceReport = (reports || [])
+    .filter(r => r.patientId === p.id && r.type === 'pt-experience')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] || null;
+
+  // 過去の施術報告書（現在編集中を除く、新しい順）
+  const pastSixMonthReports = reportHistory.filter(r => r.id !== editingId);
 
   return (
     <div className="space-y-5">
@@ -400,6 +408,22 @@ ${form.specialNotes}`;
           </div>
         )}
 
+        {/* 参照データのインジケーター */}
+        {(experienceReport || pastSixMonthReports.length > 0) && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {experienceReport && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
+                📋 体験カルテあり
+              </span>
+            )}
+            {pastSixMonthReports.length > 0 && (
+              <span className="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full">
+                📄 過去の報告書 {pastSixMonthReports.length}件
+              </span>
+            )}
+          </div>
+        )}
+
         <button onClick={handleSummarize}
           disabled={summarizing || periodReports.length === 0}
           className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
@@ -424,6 +448,8 @@ ${form.specialNotes}`;
         reportType="sixmonth"
         apiKey={settings.apiKey}
         onAutoFill={() => handleSummarize()}
+        experienceReport={experienceReport}
+        pastReports={pastSixMonthReports}
       />
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{error}</div>}
