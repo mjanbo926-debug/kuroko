@@ -40,7 +40,6 @@ export default function PartTimeSixMonthReport() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // 編集中の既存レポートID
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]); // 作成日
 
@@ -215,7 +214,6 @@ ${form.specialNotes}`;
     setReportDate(r.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0]);
     setEditingId(r.id);
     setSaved(true);
-    setHistoryOpen(false);
   };
 
   const handleNew = () => {
@@ -260,42 +258,41 @@ ${form.specialNotes}`;
         </button>
       </div>
 
-      {/* 過去の報告書履歴 */}
-      {reportHistory.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <button className="w-full flex items-center justify-between px-4 py-3"
-            onClick={() => setHistoryOpen(!historyOpen)}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <History size={16} className="text-gray-400" />過去の施術報告書（{reportHistory.length}件）
-            </div>
-            {historyOpen ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
-          </button>
-          {historyOpen && (
-            <div className="border-t border-gray-100 divide-y divide-gray-50">
-              {reportHistory.map(r => {
-                const d = r.createdAt?.split('T')[0]?.replace(/-/g, '/') || '不明';
-                const isEditing = r.id === editingId;
-                return (
-                  <button key={r.id} onClick={() => loadHistory(r)}
-                    className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                      isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{d}作成分</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        対象期間：{r.form?.recordDate?.replace(/-/g, '/') || '—'}まで
-                        {r.form?.treatmentCount && `　施術${r.form.treatmentCount}回`}
-                      </p>
-                    </div>
-                    {isEditing
-                      ? <span className="text-xs text-blue-600 font-medium">編集中</span>
-                      : <span className="text-xs text-gray-400">読み込む</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+      {/* 過去の報告書履歴（常時表示） */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+          <History size={16} className="text-gray-400" />
+          <span className="text-sm font-semibold text-gray-700">
+            過去の施術報告書{reportHistory.length > 0 ? `（${reportHistory.length}件）` : ''}
+          </span>
         </div>
-      )}
+        {reportHistory.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">保存された報告書はありません</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {reportHistory.map(r => {
+              const d = r.createdAt?.split('T')[0]?.replace(/-/g, '/') || '不明';
+              const isEditing = r.id === editingId;
+              return (
+                <button key={r.id} onClick={() => loadHistory(r)}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                    isEditing ? 'bg-blue-50' : 'hover:bg-gray-50 active:bg-gray-100'}`}>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{d}作成分</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      対象期間：{r.form?.recordDate?.replace(/-/g, '/') || '—'}まで
+                      {r.form?.treatmentCount && `　施術${r.form.treatmentCount}回`}
+                    </p>
+                  </div>
+                  {isEditing
+                    ? <span className="text-xs text-blue-600 font-medium">編集中</span>
+                    : <span className="text-xs text-gray-400">読み込む →</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* 次回作成リマインダー（要フラグが立っている場合のみ） */}
       {p.requiresSixMonthReport !== false && (() => {
