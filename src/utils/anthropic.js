@@ -167,8 +167,16 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
     if (experienceReport) {
       const ef = experienceReport.form || {};
       const symptomsText = ef.symptoms
-        ? Object.entries(ef.symptoms).filter(([, v]) => v.selected && v.selected !== '無')
-            .map(([type, v]) => `${type}：${v.selected}${v.otherText ? `（${v.otherText}）` : ''}`).join('、') || 'なし'
+        ? Object.entries(ef.symptoms)
+            .filter(([, v]) => {
+              const sel = Array.isArray(v.selected) ? v.selected : [v.selected];
+              return sel.length > 0 && !sel.every(s => s === '無' || s === '');
+            })
+            .map(([type, v]) => {
+              const sel = Array.isArray(v.selected) ? v.selected : [v.selected];
+              const areas = sel.filter(s => s && s !== '無').join('・');
+              return `${type}：${areas}${v.otherText ? `（${v.otherText}）` : ''}`;
+            }).join('、') || 'なし'
         : '';
       const areasText = (ef.treatmentAreas || []).join('、') || '';
       const posText = ef.positionContents
@@ -275,8 +283,15 @@ export async function summarizePatientDailyReports(patientName, dailyReportList,
     // 症状サマリー
     const symptomsText = ef.symptoms
       ? Object.entries(ef.symptoms)
-          .filter(([, v]) => v.selected && v.selected !== '無')
-          .map(([type, v]) => `${type}：${v.selected}${v.otherText ? `（${v.otherText}）` : ''}`)
+          .filter(([, v]) => {
+            const sel = Array.isArray(v.selected) ? v.selected : [v.selected];
+            return sel.length > 0 && !sel.every(s => s === '無' || s === '');
+          })
+          .map(([type, v]) => {
+            const sel = Array.isArray(v.selected) ? v.selected : [v.selected];
+            const areas = sel.filter(s => s && s !== '無').join('・');
+            return `${type}：${areas}${v.otherText ? `（${v.otherText}）` : ''}`;
+          })
           .join('、') || 'なし'
       : '';
     // 施術部位

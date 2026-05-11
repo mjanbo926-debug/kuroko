@@ -15,7 +15,7 @@ const TREATMENT_AREA_OPTIONS = [
 const POSITION_TYPES = ['仰臥位', '腹臥位', '座位', '横臥位(右)', '横臥位(左)'];
 
 const initSymptoms = () =>
-  Object.fromEntries(SYMPTOM_TYPES.map(s => [s, { selected: '無', otherText: '' }]));
+  Object.fromEntries(SYMPTOM_TYPES.map(s => [s, { selected: [], otherText: '' }]));
 
 export default function PartTimeExperienceReport() {
   const { selectedPatient, reports, saveReports } = useApp();
@@ -50,6 +50,23 @@ export default function PartTimeExperienceReport() {
       ...f,
       symptoms: { ...f.symptoms, [type]: { ...f.symptoms[type], [field]: val } },
     }));
+
+  const toggleSymptomArea = (type, area) =>
+    setForm(f => {
+      const current = f.symptoms[type].selected || [];
+      let next;
+      if (area === '無') {
+        // 「無」は排他選択
+        next = current.includes('無') ? [] : ['無'];
+      } else {
+        // 「無」以外を選ぶときは「無」を外す
+        const without無 = current.filter(a => a !== '無');
+        next = without無.includes(area)
+          ? without無.filter(a => a !== area)
+          : [...without無, area];
+      }
+      return { ...f, symptoms: { ...f.symptoms, [type]: { ...f.symptoms[type], selected: next } } };
+    });
 
   const toggleArea = (area) =>
     setForm(f => ({
@@ -111,12 +128,12 @@ export default function PartTimeExperienceReport() {
               <p className="text-sm font-semibold text-gray-700 mb-2">{type}</p>
               <div className="flex flex-wrap gap-2">
                 {SYMPTOM_AREAS.map(area => {
-                  const selected = form.symptoms[type].selected === area;
+                  const selected = (form.symptoms[type].selected || []).includes(area);
                   return (
                     <button
                       key={area}
                       type="button"
-                      onClick={() => setSymptom(type, 'selected', area)}
+                      onClick={() => toggleSymptomArea(type, area)}
                       className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                         selected
                           ? area === '無' ? 'bg-gray-500 text-white border-gray-500'
@@ -128,7 +145,7 @@ export default function PartTimeExperienceReport() {
                   );
                 })}
               </div>
-              {form.symptoms[type].selected === 'その他' && (
+              {(form.symptoms[type].selected || []).includes('その他') && (
                 <input
                   value={form.symptoms[type].otherText}
                   onChange={e => setSymptom(type, 'otherText', e.target.value)}
