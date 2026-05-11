@@ -14,7 +14,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function PatientDetail() {
-  const { selectedPatient, patients, reports, patientDailyReports, navigate, savePatients } = useApp();
+  const { selectedPatient, patients, reports, patientDailyReports, navigate, savePatients, saveReports } = useApp();
   const [reportHistoryOpen, setReportHistoryOpen] = useState(false);
   const [dailyHistoryOpen, setDailyHistoryOpen] = useState(false);
   const [statusNote, setStatusNote] = useState('');
@@ -500,20 +500,31 @@ export default function PatientDetail() {
               };
               const view = viewMap[r.type];
               return (
-                <button key={r.id}
-                  onClick={() => view && navigate(view, { patient })}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">{REPORT_LABELS[r.type] || r.type}</div>
-                    <div className="text-xs text-gray-500">
-                      {r.year && r.month ? `${r.year}年${r.month}月` : formatDate(r.createdAt)}
+                <div key={r.id} className="flex items-center px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <button
+                    onClick={() => view && navigate(view, { patient })}
+                    className="flex-1 flex items-center justify-between text-left min-w-0">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-800">{REPORT_LABELS[r.type] || r.type}</div>
+                      <div className="text-xs text-gray-500">
+                        {r.year && r.month ? `${r.year}年${r.month}月` : formatDate(r.createdAt)}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('ja-JP')}</span>
-                    {view && <ChevronRight size={15} className="text-gray-300" />}
-                  </div>
-                </button>
+                    <div className="flex items-center gap-1 shrink-0 mx-2">
+                      <span className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('ja-JP')}</span>
+                      {view && <ChevronRight size={15} className="text-gray-300" />}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`「${REPORT_LABELS[r.type] || r.type}」を削除しますか？`)) {
+                        saveReports(reports.filter(rep => rep.id !== r.id));
+                      }
+                    }}
+                    className="p-2 text-gray-300 hover:text-red-500 active:text-red-600 transition-colors shrink-0">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               );
             })}
           </div>
