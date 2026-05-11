@@ -193,9 +193,7 @@ function Section({ title, color, patients, visitCountMap, reportReminders }) {
                   {/* 報告書バッジ */}
                   {reminder && (() => {
                     const { days } = reminder;
-                    if (days === null) return (
-                      <span className="text-xs text-yellow-700 bg-yellow-100 px-1.5 py-0.5 rounded-full">報告書未作成</span>
-                    );
+                    if (days === null) return null;
                     if (days < 0) return (
                       <span className="text-xs text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">{Math.abs(days)}日超過</span>
                     );
