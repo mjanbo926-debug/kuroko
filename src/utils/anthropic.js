@@ -166,7 +166,15 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
   if (reportType === 'sixmonth') {
     if (experienceReport) {
       const ef = experienceReport.form || {};
-      additionalContext += `\n【初回体験カルテ（施術開始時の情報）】\n主訴：${ef.chiefComplaint || ''}\n初回施術内容：${ef.initialTreatment || ''}\n施術目標：${ef.treatmentGoal || ''}\n現在の状況（体験時）：${ef.currentStatus || ''}\n計画目標：${ef.planGoal || ''}\n計画施術内容：${ef.planTreatment || ''}\nコミュニケーション面：${ef.communicationNotes || ''}`;
+      const symptomsText = ef.symptoms
+        ? Object.entries(ef.symptoms).filter(([, v]) => v.selected && v.selected !== '無')
+            .map(([type, v]) => `${type}：${v.selected}${v.otherText ? `（${v.otherText}）` : ''}`).join('、') || 'なし'
+        : '';
+      const areasText = (ef.treatmentAreas || []).join('、') || '';
+      const posText = ef.positionContents
+        ? Object.entries(ef.positionContents).filter(([, v]) => v).map(([p, v]) => `${p}：${v}`).join('　／　')
+        : (ef.planTreatment || '');
+      additionalContext += `\n【初回体験カルテ（施術開始時の情報）】\n主訴・現状：${ef.chiefComplaint || ''}\n症状：${symptomsText}\n開始時の目標：${ef.initialGoal || ef.treatmentGoal || ''}\n施術部位：${areasText}\n施術内容（体位別）：${posText}\n追記・注意点：${ef.notes1 || ef.communicationNotes || ''}`;
     }
     if (pastReports?.length > 0) {
       additionalContext += '\n\n【過去の施術報告書（参考）】\n' + pastReports.slice(0, 2).map(r => {
@@ -264,15 +272,27 @@ export async function summarizePatientDailyReports(patientName, dailyReportList,
   let karteContext = '';
   if (experienceReport) {
     const ef = experienceReport.form || {};
+    // 症状サマリー
+    const symptomsText = ef.symptoms
+      ? Object.entries(ef.symptoms)
+          .filter(([, v]) => v.selected && v.selected !== '無')
+          .map(([type, v]) => `${type}：${v.selected}${v.otherText ? `（${v.otherText}）` : ''}`)
+          .join('、') || 'なし'
+      : '';
+    // 施術部位
+    const areasText = (ef.treatmentAreas || []).join('、') || '';
+    // 体位別施術内容
+    const posText = ef.positionContents
+      ? Object.entries(ef.positionContents).filter(([, v]) => v).map(([p, v]) => `${p}：${v}`).join('　／　')
+      : (ef.planTreatment || '');
     karteContext = `
 【初回体験カルテ（施術開始時の情報）】
-主訴：${ef.chiefComplaint || ''}
-初回施術内容：${ef.initialTreatment || ''}
-施術目標：${ef.treatmentGoal || ''}
-現在の状況（体験時）：${ef.currentStatus || ''}
-計画目標：${ef.planGoal || ''}
-計画施術内容：${ef.planTreatment || ''}
-コミュニケーション面：${ef.communicationNotes || ''}`;
+主訴・現状：${ef.chiefComplaint || ''}
+症状：${symptomsText}
+開始時の目標：${ef.initialGoal || ef.treatmentGoal || ''}
+施術部位：${areasText}
+施術内容（体位別）：${posText}
+追記・注意点：${ef.notes1 || ef.communicationNotes || ''}`;
   }
 
   // 過去の施術報告書コンテキスト（最新2件）

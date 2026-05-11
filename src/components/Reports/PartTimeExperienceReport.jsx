@@ -1,29 +1,66 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
 import { generatePartTimeExperienceExcel } from '../../utils/excel';
-import { generateId, ADL_OPTIONS } from '../../utils/helpers';
+import { generateId } from '../../utils/helpers';
 import { FileDown, Save } from 'lucide-react';
 
-const ADL_FIELDS = [
-  ['turning', '寝返り'], ['sittingUp', '起き上り'], ['standingUp', '立ち上り'],
-  ['transfer', '移乗'], ['standing', '立位'], ['walking', '歩行'],
+const SYMPTOM_TYPES = ['拘縮', '麻痺', 'しびれ', 'むくみ'];
+const SYMPTOM_AREAS = ['無', '全身', '右上肢', '左上肢', '右下肢', '左下肢', '体幹', 'その他'];
+
+const TREATMENT_AREA_OPTIONS = [
+  ['マ右上肢', 'マ右下肢', 'マ左上肢', 'マ左下肢', '温'],
+  ['マ体幹', '変右上肢', '変右下肢', '変左上肢', '変左下肢'],
 ];
+
+const POSITION_TYPES = ['仰臥位', '腹臥位', '座位', '横臥位(右)', '横臥位(左)'];
+
+const initSymptoms = () =>
+  Object.fromEntries(SYMPTOM_TYPES.map(s => [s, { selected: '無', otherText: '' }]));
 
 export default function PartTimeExperienceReport() {
   const { selectedPatient, reports, saveReports } = useApp();
   const p = selectedPatient;
 
   const [form, setForm] = useState({
-    karteNo: '', implementDate: new Date().toISOString().split('T')[0],
-    insuranceInfo: '', lifeSchedule: '',
-    chiefComplaint: '', initialTreatment: '', treatmentGoal: '', communicationNotes: '',
-    currentStatus: '', planGoal: '', planTreatment: '', communication: '',
+    karteNo: '',
+    implementDate: new Date().toISOString().split('T')[0],
+    insuranceInfo: '',
+    lifeSchedule: '',
+    // 症状
+    symptoms: initSymptoms(),
+    // 主訴・現状
+    chiefComplaint: '',
+    notes1: '',           // 〈追記・注意点〉（主訴の後）
+    // 開始時の目標
+    initialGoal: '',
+    // 施術部位
+    treatmentAreas: [],
+    // 施術内容（体位別）
+    positionContents: Object.fromEntries(POSITION_TYPES.map(p => [p, ''])),
+    notes2: '',           // 〈追記・注意点〉（施術の後）
+    // ADL（後方互換）
     adl: { ...p?.adl } || {},
   });
   const [saved, setSaved] = useState(false);
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
-  const setAdl = (key, val) => setForm(f => ({ ...f, adl: { ...f.adl, [key]: val } }));
+
+  const setSymptom = (type, field, val) =>
+    setForm(f => ({
+      ...f,
+      symptoms: { ...f.symptoms, [type]: { ...f.symptoms[type], [field]: val } },
+    }));
+
+  const toggleArea = (area) =>
+    setForm(f => ({
+      ...f,
+      treatmentAreas: f.treatmentAreas.includes(area)
+        ? f.treatmentAreas.filter(a => a !== area)
+        : [...f.treatmentAreas, area],
+    }));
+
+  const setPosition = (pos, val) =>
+    setForm(f => ({ ...f, positionContents: { ...f.positionContents, [pos]: val } }));
 
   const handleExport = () => {
     generatePartTimeExperienceExcel(p, form);
@@ -41,14 +78,19 @@ export default function PartTimeExperienceReport() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-gray-800">体験報告書</h2>
-        <p className="text-sm text-gray-500 mt-0.5">副業先・初回 — Excel出力（3シート）</p>
+        <h2 className="text-xl font-bold text-gray-800">体験報告書 / カルテ</h2>
+        <p className="text-sm text-gray-500 mt-0.5">副業先・初回 — Excel出力</p>
       </div>
 
-      <Card title="患者情報シート">
+      {/* 基本情報 */}
+      <Card title="基本情報">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="カルテNo"><input value={form.karteNo} onChange={e => set('karteNo', e.target.value)} className={inp()} placeholder="例：001" /></Field>
-          <Field label="実施日"><input type="date" value={form.implementDate} onChange={e => set('implementDate', e.target.value)} className={inp()} /></Field>
+          <Field label="カルテNo">
+            <input value={form.karteNo} onChange={e => set('karteNo', e.target.value)} className={inp()} placeholder="例：200044" />
+          </Field>
+          <Field label="実施日">
+            <input type="date" value={form.implementDate} onChange={e => set('implementDate', e.target.value)} className={inp()} />
+          </Field>
         </div>
         <Field label="保険情報">
           <input value={form.insuranceInfo} onChange={e => set('insuranceInfo', e.target.value)} className={inp()} placeholder="例：後期高齢者医療 / 国民健康保険" />
@@ -59,61 +101,127 @@ export default function PartTimeExperienceReport() {
           <p><b>同意医師：</b>{p.consentDoctor}　<b>同意病院：</b>{p.consentHospital}</p>
           <p><b>ケアマネ：</b>{p.careManager}</p>
         </div>
-        <h4 className="text-sm font-semibold text-gray-600 mt-2">ADL状況</h4>
-        <div className="grid grid-cols-2 gap-3">
-          {ADL_FIELDS.map(([key, label]) => (
-            <Field key={key} label={label}>
-              <select value={form.adl[key] || ''} onChange={e => setAdl(key, e.target.value)} className={inp()}>
-                {ADL_OPTIONS.map(o => <option key={o} value={o}>{o || '未設定'}</option>)}
-              </select>
-            </Field>
+      </Card>
+
+      {/* 症状 */}
+      <Card title="症状">
+        <div className="space-y-4">
+          {SYMPTOM_TYPES.map(type => (
+            <div key={type}>
+              <p className="text-sm font-semibold text-gray-700 mb-2">{type}</p>
+              <div className="flex flex-wrap gap-2">
+                {SYMPTOM_AREAS.map(area => {
+                  const selected = form.symptoms[type].selected === area;
+                  return (
+                    <button
+                      key={area}
+                      type="button"
+                      onClick={() => setSymptom(type, 'selected', area)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        selected
+                          ? area === '無' ? 'bg-gray-500 text-white border-gray-500'
+                            : 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                      }`}>
+                      {area}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.symptoms[type].selected === 'その他' && (
+                <input
+                  value={form.symptoms[type].otherText}
+                  onChange={e => setSymptom(type, 'otherText', e.target.value)}
+                  className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="その他の詳細を入力..."
+                />
+              )}
+            </div>
           ))}
         </div>
-        <Field label="生活スケジュール">
-          <textarea value={form.lifeSchedule} onChange={e => set('lifeSchedule', e.target.value)}
-            className={ta()} rows={2} placeholder="起床・食事・就寝時間など日常の生活リズムを記入..." />
-        </Field>
       </Card>
 
-      <Card title="カルテシート">
-        <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-700 space-y-1">
-          <p><b>傷病名：</b>{p.diagnosis}</p>
-          <p><b>既往歴：</b>{p.medicalHistory}</p>
+      {/* 既往歴 */}
+      <Card title="既往歴">
+        <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-700">
+          {p.medicalHistory
+            ? <p className="whitespace-pre-wrap">{p.medicalHistory}</p>
+            : <p className="text-gray-400">患者情報に既往歴が登録されていません</p>}
         </div>
-        <Field label="主訴">
+        <p className="text-xs text-gray-400">※ 変更は患者情報の編集から行ってください</p>
+      </Card>
+
+      {/* 主訴・現状 */}
+      <Card title="主訴・現状">
+        <Field label="傷病名">
+          <div className="bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-700">
+            {p.diagnosis || <span className="text-gray-400">患者情報に傷病名が登録されていません</span>}
+          </div>
+        </Field>
+        <Field label="主訴・現状">
           <textarea value={form.chiefComplaint} onChange={e => set('chiefComplaint', e.target.value)}
-            className={ta()} rows={2} placeholder="患者様の主訴・困りごとを記入..." />
+            className={ta()} rows={5}
+            placeholder="〇右上肢、右下肢に麻痺があります。&#10;〇自宅での移動手段は車椅子です。&#10;〇右手首、手指の拘縮がみられます。" />
         </Field>
-        <Field label="初回施術内容">
-          <textarea value={form.initialTreatment} onChange={e => set('initialTreatment', e.target.value)}
-            className={ta()} rows={3} placeholder="初回の施術内容を記入..." />
-        </Field>
-        <Field label="施術目標">
-          <textarea value={form.treatmentGoal} onChange={e => set('treatmentGoal', e.target.value)}
-            className={ta()} rows={2} placeholder="施術目標を記入..." />
-        </Field>
-        <Field label="コミュニケーション面の気になる点">
-          <textarea value={form.communicationNotes} onChange={e => set('communicationNotes', e.target.value)}
-            className={ta()} rows={2} placeholder="コミュニケーション面で気になったことを記入..." />
+        <Field label="〈追記・注意点〉">
+          <textarea value={form.notes1} onChange={e => set('notes1', e.target.value)}
+            className={ta()} rows={3} placeholder="追記・注意点があれば記入..." />
         </Field>
       </Card>
 
-      <Card title="施術計画書シート">
-        <Field label="現在の状況">
-          <textarea value={form.currentStatus} onChange={e => set('currentStatus', e.target.value)}
-            className={ta()} rows={2} placeholder="現在の身体・生活状況を記入..." />
-        </Field>
-        <Field label="目標">
-          <textarea value={form.planGoal} onChange={e => set('planGoal', e.target.value)}
-            className={ta()} rows={2} placeholder="施術の目標を記入..." />
-        </Field>
-        <Field label="施術内容">
-          <textarea value={form.planTreatment} onChange={e => set('planTreatment', e.target.value)}
-            className={ta()} rows={2} placeholder="予定している施術内容を記入..." />
-        </Field>
-        <Field label="声かけ・コミュニケーション">
-          <textarea value={form.communication} onChange={e => set('communication', e.target.value)}
-            className={ta()} rows={2} placeholder="声かけやコミュニケーションの方針を記入..." />
+      {/* 開始時の目標 */}
+      <Card title="開始時の目標">
+        <textarea value={form.initialGoal} onChange={e => set('initialGoal', e.target.value)}
+          className={ta()} rows={4}
+          placeholder="〇体調を整えて、穏やかに毎日を過ごせるサポートをしたい。&#10;〇各部筋緊張の軽減。&#10;〇各関節柔軟性の向上による拘縮の改善。" />
+      </Card>
+
+      {/* 施術部位 */}
+      <Card title="施術部位">
+        <div className="space-y-2">
+          {TREATMENT_AREA_OPTIONS.map((row, ri) => (
+            <div key={ri} className="flex flex-wrap gap-2">
+              {row.map(area => {
+                const checked = form.treatmentAreas.includes(area);
+                const isHeat = area === '温';
+                return (
+                  <button
+                    key={area}
+                    type="button"
+                    onClick={() => toggleArea(area)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      checked
+                        ? isHeat ? 'bg-orange-500 text-white border-orange-500' : 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                    }`}>
+                    {checked ? '☑' : '□'} {area}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* 施術内容（体位別） */}
+      <Card title="施術内容（体位別）">
+        <div className="space-y-4">
+          {POSITION_TYPES.map(pos => (
+            <div key={pos} className="bg-gray-50 rounded-xl p-3">
+              <p className="text-sm font-semibold text-gray-700 mb-2">{pos}</p>
+              <textarea
+                value={form.positionContents[pos]}
+                onChange={e => setPosition(pos, e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none bg-white"
+                rows={2}
+                placeholder={pos === '仰臥位' ? '例：両上肢、両下肢：マッサージ、ストレッチ、運動療法' : pos === '座位' ? '例：頸、肩部、背腰部：マッサージ、ストレッチ' : '施術内容を記入...'}
+              />
+            </div>
+          ))}
+        </div>
+        <Field label="〈追記・注意点〉">
+          <textarea value={form.notes2} onChange={e => set('notes2', e.target.value)}
+            className={ta()} rows={2} placeholder="追記・注意点があれば記入..." />
         </Field>
       </Card>
 
