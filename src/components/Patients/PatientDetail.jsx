@@ -480,33 +480,45 @@ export default function PatientDetail() {
         </div>
       </div>
 
-      {/* 報告書履歴 */}
-      {patientReports.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <button className="w-full flex items-center justify-between"
-            onClick={() => setReportHistoryOpen(!reportHistoryOpen)}>
-            <h3 className="text-sm font-semibold text-gray-600">
-              報告書履歴 <span className="text-gray-400 font-normal">({patientReports.length}件)</span>
-            </h3>
-            <ChevronRight size={18} className={`text-gray-400 transition-transform ${reportHistoryOpen ? 'rotate-90' : ''}`} />
-          </button>
-          {reportHistoryOpen && (
-            <div className="mt-3 space-y-2">
-              {patientReports.map(r => (
-                <div key={r.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+      {/* 報告書履歴（常時表示） */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-600">
+            報告書履歴 <span className="text-gray-400 font-normal">({patientReports.length}件)</span>
+          </h3>
+        </div>
+        {patientReports.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">保存された報告書はありません</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {patientReports.map(r => {
+              const viewMap = {
+                'pt-experience': 'report-pt-experience',
+                'pt-sixmonth': 'report-pt-sixmonth',
+                'ft-experience': 'report-ft-experience',
+                'ft-monthly': 'report-ft-monthly',
+              };
+              const view = viewMap[r.type];
+              return (
+                <button key={r.id}
+                  onClick={() => view && navigate(view, { patient })}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left">
                   <div>
                     <div className="text-sm font-medium text-gray-800">{REPORT_LABELS[r.type] || r.type}</div>
                     <div className="text-xs text-gray-500">
                       {r.year && r.month ? `${r.year}年${r.month}月` : formatDate(r.createdAt)}
                     </div>
                   </div>
-                  <span className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('ja-JP')}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('ja-JP')}</span>
+                    {view && <ChevronRight size={15} className="text-gray-300" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* 施術終了 */}
       {patient.terminated ? (
