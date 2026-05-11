@@ -17,31 +17,43 @@ const POSITION_TYPES = ['仰臥位', '腹臥位', '座位', '横臥位(右)', '�
 const initSymptoms = () =>
   Object.fromEntries(SYMPTOM_TYPES.map(s => [s, { selected: [], otherText: '' }]));
 
+const emptyForm = (adl = {}) => ({
+  karteNo: '',
+  implementDate: new Date().toISOString().split('T')[0],
+  insuranceInfo: '',
+  lifeSchedule: '',
+  symptoms: initSymptoms(),
+  chiefComplaint: '',
+  notes1: '',
+  initialGoal: '',
+  treatmentAreas: [],
+  positionContents: Object.fromEntries(POSITION_TYPES.map(p => [p, ''])),
+  notes2: '',
+  adl: { ...adl },
+});
+
 export default function PartTimeExperienceReport() {
   const { selectedPatient, reports, saveReports } = useApp();
   const p = selectedPatient;
 
-  const [form, setForm] = useState({
-    karteNo: '',
-    implementDate: new Date().toISOString().split('T')[0],
-    insuranceInfo: '',
-    lifeSchedule: '',
-    // 症状
-    symptoms: initSymptoms(),
-    // 主訴・現状
-    chiefComplaint: '',
-    notes1: '',           // 〈追記・注意点〉（主訴の後）
-    // 開始時の目標
-    initialGoal: '',
-    // 施術部位
-    treatmentAreas: [],
-    // 施術内容（体位別）
-    positionContents: Object.fromEntries(POSITION_TYPES.map(p => [p, ''])),
-    notes2: '',           // 〈追記・注意点〉（施術の後）
-    // ADL（後方互換）
-    adl: { ...p?.adl } || {},
-  });
-  const [saved, setSaved] = useState(false);
+  // 最新の保存済みカルテを取得
+  const latestSaved = (reports || [])
+    .filter(r => r.patientId === p.id && r.type === 'pt-experience')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] || null;
+
+  const [form, setForm] = useState(() =>
+    latestSaved?.form
+      ? {
+          ...emptyForm(p?.adl),
+          ...latestSaved.form,
+          // 旧データとの互換性：症状がなければ初期化
+          symptoms: latestSaved.form.symptoms || initSymptoms(),
+          positionContents: latestSaved.form.positionContents || Object.fromEntries(POSITION_TYPES.map(pos => [pos, ''])),
+        }
+      : emptyForm(p?.adl)
+  );
+  const [editingId, setEditingId] = useState(latestSaved?.id || null);
+  const [saved, setSaved] = useState(!!latestSaved);
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
@@ -85,10 +97,17 @@ export default function PartTimeExperienceReport() {
 
   const handleSave = () => {
     const report = {
-      id: generateId(), patientId: p.id, type: 'pt-experience',
-      form, createdAt: new Date().toISOString(),
+      id: editingId || generateId(),
+      patientId: p.id, type: 'pt-experience',
+      form,
+      createdAt: latestSaved?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-    saveReports([...reports, report]);
+    const updated = editingId
+      ? reports.map(r => r.id === editingId ? report : r)
+      : [...reports, report];
+    saveReports(updated);
+    setEditingId(report.id);
     setSaved(true);
   };
 
@@ -248,9 +267,8 @@ export default function PartTimeExperienceReport() {
           <FileDown size={20} />Excelで出力
         </button>
         <button onClick={handleSave}
-          className={`px-5 py-3.5 rounded-xl font-semibold transition-colors flex items-center gap-2 ${
-            saved ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-          <Save size={18} />{saved ? '保存済み' : '履歴に保存'}
+          className="px-5 py-3.5 rounded-xl font-semibold transition-colors flex items-center gap-2 bg-gray-100 text-gray-700 hover:bg-gray-200">
+          <Save size={18} />{editingId ? '上書き保存' : '保存'}
         </button>
       </div>
     </div>
