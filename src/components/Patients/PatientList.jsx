@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { Plus, Search, User, MapPin, Calendar } from 'lucide-react';
+import { Plus, Search, User, MapPin, Calendar, CheckCircle2, Clock } from 'lucide-react';
 
 export default function PatientList() {
-  const { patients, navigate } = useApp();
+  const { patients, reports, navigate } = useApp();
+  const now = new Date();
+  const cy = now.getFullYear();
+  const cm = now.getMonth() + 1;
   const [tab, setTab] = useState('fullTime');
   const [query, setQuery] = useState('');
   const [showTerminated, setShowTerminated] = useState(false);
@@ -51,6 +54,22 @@ export default function PatientList() {
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
       </div>
 
+      {/* 月次報告書ステータスサマリー（正社員先のみ） */}
+      {tab === 'fullTime' && filtered.length > 0 && (() => {
+        const eligible = filtered.filter(p => !p.isTrial);
+        const done = eligible.filter(p => reports.some(r =>
+          r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm
+        )).length;
+        const total = eligible.length;
+        return (
+          <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium mb-3 ${
+            done === total ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>
+            <span>{cy}年{cm}月の月次報告書</span>
+            <span className="font-bold">{done} / {total} 完了</span>
+          </div>
+        );
+      })()}
+
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <User size={48} className="mx-auto mb-3 opacity-25" />
@@ -59,10 +78,16 @@ export default function PatientList() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(p => (
-            <PatientCard key={p.id} patient={p}
-              onClick={() => navigate('patient-detail', { patient: p })} />
-          ))}
+          {filtered.map(p => {
+            const hasMonthlyReport = reports.some(r =>
+              r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm
+            );
+            return (
+              <PatientCard key={p.id} patient={p}
+                hasMonthlyReport={hasMonthlyReport}
+                onClick={() => navigate('patient-detail', { patient: p })} />
+            );
+          })}
         </div>
       )}
 
@@ -86,7 +111,7 @@ export default function PatientList() {
   );
 }
 
-function PatientCard({ patient, onClick, terminated }) {
+function PatientCard({ patient, onClick, terminated, hasMonthlyReport }) {
   const days = Array.isArray(patient.visitDays)
     ? patient.visitDays.join('・')
     : (patient.visitDays || '');
@@ -124,10 +149,17 @@ function PatientCard({ patient, onClick, terminated }) {
             <p className="text-xs text-gray-400 mt-1 truncate">{patient.diagnosis}</p>
           )}
         </div>
-        <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full font-medium ${
-          patient.type === 'fullTime' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-          {patient.type === 'fullTime' ? '正社員先' : '副業先'}
-        </span>
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+            patient.type === 'fullTime' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            {patient.type === 'fullTime' ? '正社員先' : '副業先'}
+          </span>
+          {patient.type === 'fullTime' && !patient.isTrial && !terminated && (
+            hasMonthlyReport
+              ? <span className="flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 size={12} />月報済</span>
+              : <span className="flex items-center gap-1 text-xs text-orange-500 font-medium"><Clock size={12} />月報未</span>
+          )}
+        </div>
       </div>
     </button>
   );

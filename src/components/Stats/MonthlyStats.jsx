@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Gift } from 'lucide-react';
 
 const VISIT_LIMIT = 16;
 
@@ -72,6 +72,20 @@ export default function MonthlyStats() {
 
   // 16回以上の患者
   const overLimitPatients = patients.filter(p => (visitCountMap[p.id] || 0) >= VISIT_LIMIT);
+
+  // インセンティブ集計（平日のみ、正社員先8名超えた分）
+  const ftPatientIds = new Set(fullTimePatients.map(p => p.id));
+  const incentiveDays = [];
+  monthReports.forEach(r => {
+    const d = new Date(r.date + 'T00:00:00');
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) return; // 土日除外
+    const ftVisited = (r.visits || []).filter(v => v.visited && ftPatientIds.has(v.patientId)).length;
+    if (ftVisited > 8) {
+      incentiveDays.push({ date: r.date, total: ftVisited, bonus: ftVisited - 8 });
+    }
+  });
+  const totalIncentive = incentiveDays.reduce((s, d) => s + d.bonus, 0);
 
   // 副業先：施術報告書リマインダー（要フラグが立っている患者のみ）
   const ptReportReminders = partTimePatients
@@ -146,6 +160,39 @@ export default function MonthlyStats() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center justify-between">
         <span className="text-sm text-gray-600 font-medium">合計訪問回数</span>
         <span className="text-2xl font-bold text-gray-800">{totalFT + totalPT}<span className="text-sm font-normal text-gray-400 ml-1">回</span></span>
+      </div>
+
+      {/* インセンティブ集計 */}
+      <div className={`rounded-2xl shadow-sm border p-4 space-y-3 ${totalIncentive > 0 ? 'bg-purple-50 border-purple-200' : 'bg-white border-gray-100'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gift size={16} className={totalIncentive > 0 ? 'text-purple-600' : 'text-gray-400'} />
+            <span className={`text-sm font-semibold ${totalIncentive > 0 ? 'text-purple-800' : 'text-gray-600'}`}>インセンティブ（正社員先・平日9名目〜）</span>
+          </div>
+          <span className={`text-2xl font-bold ${totalIncentive > 0 ? 'text-purple-700' : 'text-gray-400'}`}>
+            {totalIncentive}<span className="text-sm font-normal ml-1">件</span>
+          </span>
+        </div>
+        {incentiveDays.length > 0 && (
+          <div className="space-y-1.5">
+            {incentiveDays.map(({ date, total, bonus }) => {
+              const d = new Date(date + 'T00:00:00');
+              const label = `${d.getMonth() + 1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）`;
+              return (
+                <div key={date} className="flex items-center justify-between bg-white rounded-xl px-3 py-2 border border-purple-100">
+                  <span className="text-sm text-gray-700">{label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">計{total}名</span>
+                    <span className="text-sm font-bold text-purple-600">+{bonus}件</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {incentiveDays.length === 0 && (
+          <p className="text-xs text-gray-400">今月はインセンティブ対象の日はありません</p>
+        )}
       </div>
 
       {/* 患者ごと：正社員先 */}

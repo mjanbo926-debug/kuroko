@@ -54,7 +54,9 @@ export default function DailyReport() {
   const { selectedDate, patients, dailyReports, saveDailyReports, scheduleOverrides, navigate } = useApp();
 
   const date = selectedDate || localDateStr();
-  const scheduledPatients = getPatientsForDate(patients, date, scheduleOverrides);
+  const todayStr = localDateStr();
+  const scheduledPatients = getPatientsForDate(patients, date, scheduleOverrides)
+    .filter(p => !(p.consentObtained === false && !p.isTrial && date >= todayStr));
 
   const existing = dailyReports.find(r => r.date === date);
 
@@ -71,6 +73,11 @@ export default function DailyReport() {
         notes: saved?.notes ?? '',
         adlNotes: saved?.adlNotes ?? '',
         specialNotes: saved?.specialNotes ?? '',
+        bloodPressure: saved?.bloodPressure ?? {
+          before: { systolic: '', diastolic: '' },
+          during: { systolic: '', diastolic: '' },
+          after: { systolic: '', diastolic: '' },
+        },
       };
     });
 
@@ -94,6 +101,15 @@ export default function DailyReport() {
       const parts = v.bodyParts || [];
       const next = parts.includes(part) ? parts.filter(p => p !== part) : [...parts, part];
       return { ...v, bodyParts: next };
+    }));
+    setSaved(false);
+  };
+
+  const setBloodPressure = (patientId, timing, field, val) => {
+    setVisits(vs => vs.map(v => {
+      if (v.patientId !== patientId) return v;
+      const bp = { ...(v.bloodPressure || {}), [timing]: { ...(v.bloodPressure?.[timing] || {}), [field]: val } };
+      return { ...v, bloodPressure: bp };
     }));
     setSaved(false);
   };
@@ -218,7 +234,23 @@ export default function DailyReport() {
                         <span className="text-blue-500">記録あり</span>
                       )}
                       {!visit.visited && <span className="text-orange-500">未訪問</span>}
+                      {(patient.confirmItems || []).filter(i => !i.done).length > 0 && (
+                        <span className="text-orange-600 font-medium bg-orange-100 px-1.5 py-0.5 rounded-full">
+                          ！確認{(patient.confirmItems || []).filter(i => !i.done).length}件
+                        </span>
+                      )}
                     </div>
+                    {/* 未チェックの確認事項リマインダー */}
+                    {(patient.confirmItems || []).filter(i => !i.done).length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {(patient.confirmItems || []).filter(i => !i.done).map(item => (
+                          <div key={item.id} className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-lg px-2.5 py-1.5">
+                            <span className="text-orange-500 shrink-0">📋</span>
+                            <span className="text-xs text-orange-700 flex-1">{item.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <button onClick={() => toggleExpand(visit.patientId)}
@@ -313,6 +345,40 @@ export default function DailyReport() {
                         onChange={e => setVisit(visit.patientId, 'specialNotes', e.target.value)}
                         className={ta()} rows={2} placeholder="特記事項・申し送りなど..." />
                     </Field>
+
+                    {/* 血圧記録（フラグが立っている患者のみ） */}
+                    {patient.trackBloodPressure && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 mb-2">血圧記録（mmHg）</p>
+                        <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-2">
+                          {[['before', '施術前'], ['during', '施術中'], ['after', '施術後']].map(([timing, label]) => {
+                            const bp = visit.bloodPressure?.[timing] || {};
+                            return (
+                              <div key={timing} className="flex items-center gap-2">
+                                <span className="text-xs text-gray-600 w-12 shrink-0 font-medium">{label}</span>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  placeholder="収縮期"
+                                  value={bp.systolic || ''}
+                                  onChange={e => setBloodPressure(visit.patientId, timing, 'systolic', e.target.value)}
+                                  className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
+                                />
+                                <span className="text-gray-400 text-sm font-medium">/</span>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  placeholder="拡張期"
+                                  value={bp.diastolic || ''}
+                                  onChange={e => setBloodPressure(visit.patientId, timing, 'diastolic', e.target.value)}
+                                  className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

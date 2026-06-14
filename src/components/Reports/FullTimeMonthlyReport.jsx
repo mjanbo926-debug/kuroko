@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { correctMonthlyReport, summarizeMonthlyReport } from '../../utils/anthropic';
+import { correctMonthlyReport, correctText, summarizeMonthlyReport } from '../../utils/anthropic';
 import { generateId, getCurrentYearMonth } from '../../utils/helpers';
 import CopyButton from '../Common/CopyButton';
 import ReportAIGenerator from './ReportAIGenerator';
@@ -13,7 +13,8 @@ const SECTIONS = [
   ['lifeObservations', '気になる事', '生活面で気になった点を記入...'],
 ];
 
-const CLOSING = '引き続き施術を行い、症状や運動機能の改善を目指します。';
+const CLOSING_COMPANY = '引き続き施術を行い、症状や運動機能の改善を目指します。';
+const CLOSING_FAMILY = '引き続き丁寧に施術を行ってまいります。何かご心配な点がございましたら、いつでもお声がけください。';
 
 export default function FullTimeMonthlyReport() {
   const { selectedPatient, reports, saveReports, dailyReports, settings } = useApp();
@@ -33,6 +34,7 @@ export default function FullTimeMonthlyReport() {
   const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [target, setTarget] = useState('company');
 
   const history = reports
     .filter(r => r.patientId === p.id && r.type === 'ft-monthly')
@@ -61,7 +63,7 @@ export default function FullTimeMonthlyReport() {
     setSummarizing(true);
     setError('');
     try {
-      const result = await summarizeMonthlyReport(p.name, year, month, monthReports, settings.apiKey);
+      const result = await summarizeMonthlyReport(p.name, year, month, monthReports, settings.apiKey, target);
       setSections({
         healthCondition: result.healthCondition || '',
         physicalCondition: result.physicalCondition || '',
@@ -77,23 +79,27 @@ export default function FullTimeMonthlyReport() {
     }
   };
 
+  const closing = target === 'family' ? CLOSING_FAMILY : CLOSING_COMPANY;
+
+  const nameLabel = p.name.endsWith('様') ? p.name : `${p.name}様`;
+
   const buildText = (data) => {
     const s = data || sections;
-    return `${p.name}様\n\n` +
+    return `${nameLabel}\n\n` +
       `『${month}月の体調』\n${s.healthCondition || ''}\n\n` +
       `『身体の様子』\n${s.physicalCondition || ''}\n\n` +
       `『施術内容』\n${s.treatmentContent || ''}\n\n` +
       `『気になる事』\n${s.lifeObservations || ''}\n\n` +
-      CLOSING;
+      closing;
   };
 
   const handleCorrect = async () => {
     setError('');
     setLoading(true);
     try {
-      const result = await correctMonthlyReport(sections, settings.apiKey);
+      const result = await correctMonthlyReport(sections, settings.apiKey, target);
       // 添削結果に患者名・締め文を付加して完成文にする
-      setCorrected(`${p.name}様\n\n${result}\n\n${CLOSING}`);
+      setCorrected(`${nameLabel}\n\n${result}\n\n${closing}`);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -120,9 +126,36 @@ export default function FullTimeMonthlyReport() {
   };
 
   const handleAutoFillFromAI = (aiText) => {
-    // AIストリーミング生成結果をプレビューとして corrected にセット
-    setCorrected(aiText);
+    // ストリーミング結果を各セクションにパースして振り分ける
+    const extract = (header) => {
+      const regex = new RegExp(`『${header}』\\s*([\\s\\S]*?)(?=『[^』]+』|$)`);
+      const match = aiText.match(regex);
+      return match ? match[1].trim() : '';
+    };
+    const hc = extract('体調') || extract(`${month}月の体調`);
+    const pc = extract('身体の様子');
+    const tc = extract('施術内容');
+    const lo = extract('気になる事');
+    if (hc || pc || tc) {
+      setSections({ healthCondition: hc, physicalCondition: pc, treatmentContent: tc, lifeObservations: lo });
+      setCorrected('');
+    } else {
+      setCorrected(aiText);
+    }
     setSaved(false);
+  };
+
+  const handleReCorrect = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await correctText(corrected, settings.apiKey);
+      setCorrected(result);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const outputText = corrected || buildText();
@@ -132,6 +165,29 @@ export default function FullTimeMonthlyReport() {
       <div>
         <h2 className="text-xl font-bold text-gray-800">月次報告書</h2>
         <p className="text-sm text-gray-500 mt-0.5">正社員先 — LINE出力</p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <p className="text-xs font-medium text-gray-500 mb-2">送付先</p>
+        <div className="flex gap-2">
+          {[['company', '会社・ケアマネ'], ['family', 'ご家族']].map(([val, label]) => (
+            <button key={val} type="button" onClick={() => setTarget(val)}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                target === val
+                  ? val === 'family'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {target === 'family' && (
+          <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2 mt-2 border border-amber-100">
+            専門用語を使わず、ご家族が読んで安心できる温かみのある文章で作成します
+          </p>
+        )}
       </div>
 
       <Card title="対象月">
@@ -165,6 +221,7 @@ export default function FullTimeMonthlyReport() {
             reportType="monthly"
             apiKey={settings.apiKey}
             onAutoFill={handleAutoFillFromAI}
+            target={target}
           />
         );
       })()}
@@ -186,7 +243,7 @@ export default function FullTimeMonthlyReport() {
           </div>
         )}
         <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-400 border border-gray-100">
-          締め文（固定）：{CLOSING}
+          締め文（固定）：{closing}
         </div>
       </Card>
 
@@ -198,12 +255,27 @@ export default function FullTimeMonthlyReport() {
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{error}</div>}
 
-      <Card title={corrected ? '添削後の報告文' : '報告文プレビュー（添削前）'}>
-        <pre className="whitespace-pre-wrap text-sm text-gray-800 bg-gray-50 rounded-xl p-4 leading-relaxed max-h-96 overflow-y-auto">
-          {outputText}
-        </pre>
+      <Card title={corrected ? '添削後の報告文（編集可）' : '報告文プレビュー（添削前）'}>
+        {corrected ? (
+          <>
+            <textarea
+              value={corrected}
+              onChange={e => { setCorrected(e.target.value); setSaved(false); }}
+              className="w-full px-3 py-2.5 border border-purple-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none leading-relaxed"
+              rows={16}
+            />
+            <button onClick={handleReCorrect} disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-purple-100 text-purple-700 border border-purple-200 py-2.5 rounded-xl text-sm font-semibold hover:bg-purple-200 transition-colors disabled:opacity-60">
+              {loading ? <><Loader2 size={16} className="animate-spin" />AI添削中...</> : <><Sparkles size={16} />修正後に再度AIで添削する</>}
+            </button>
+          </>
+        ) : (
+          <pre className="whitespace-pre-wrap text-sm text-gray-800 bg-gray-50 rounded-xl p-4 leading-relaxed max-h-96 overflow-y-auto">
+            {outputText}
+          </pre>
+        )}
         <div className="flex gap-3 mt-3 flex-wrap">
-          <CopyButton text={outputText} />
+          <CopyButton text={corrected || outputText} />
           {!saved && (
             <button onClick={handleSave}
               className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200">

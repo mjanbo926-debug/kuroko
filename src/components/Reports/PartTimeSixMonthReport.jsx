@@ -129,6 +129,40 @@ export default function PartTimeSixMonthReport() {
     }
   };
 
+  const handleAutoFillFromAI = (aiText) => {
+    // ストリーミング結果を各フィールドにパースして振り分ける
+    const extract = (header) => {
+      const regex = new RegExp(`■ ${header}\\s*([\\s\\S]*?)(?=■ |$)`);
+      const match = aiText.match(regex);
+      return match ? match[1].trim() : '';
+    };
+    const parsed = {
+      initialStatus: extract('施術開始時の状況'),
+      treatmentContent: extract('施術内容'),
+      mentalCare: extract('声かけ・メンタルケア'),
+      currentStatus: extract('現状'),
+      futureApproach: extract('今後の取り組み'),
+      specialNotes: extract('特記事項'),
+    };
+    if (parsed.initialStatus || parsed.currentStatus || parsed.treatmentContent) {
+      setForm(f => ({ ...f, ...parsed }));
+    }
+    setSaved(false);
+  };
+
+  const handleReCorrect = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await correctText(corrected, settings.apiKey);
+      setCorrected(result);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCorrect = async () => {
     setError('');
     setLoading(true);
@@ -444,7 +478,7 @@ ${form.specialNotes}`;
         period={`${sixMonthsAgo.replace(/-/g, '/')} 〜 ${form.recordDate.replace(/-/g, '/')}`}
         reportType="sixmonth"
         apiKey={settings.apiKey}
-        onAutoFill={() => handleSummarize()}
+        onAutoFill={handleAutoFillFromAI}
         experienceReport={experienceReport}
         pastReports={pastSixMonthReports}
       />
@@ -529,9 +563,18 @@ ${form.specialNotes}`;
       </button>
 
       {corrected && (
-        <Card title="AI添削後の報告文">
-          <pre className="whitespace-pre-wrap text-sm text-gray-800 bg-gray-50 rounded-xl p-4 leading-relaxed max-h-80 overflow-y-auto">{corrected}</pre>
-          <p className="text-xs text-gray-400 mt-1">※ Excel出力時にこの添削文も含まれます</p>
+        <Card title="AI添削後の報告文（編集可）">
+          <textarea
+            value={corrected}
+            onChange={e => { setCorrected(e.target.value); setSaved(false); }}
+            className="w-full px-3 py-2.5 border border-purple-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none leading-relaxed"
+            rows={16}
+          />
+          <button onClick={handleReCorrect} disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-purple-100 text-purple-700 border border-purple-200 py-2.5 rounded-xl text-sm font-semibold hover:bg-purple-200 transition-colors disabled:opacity-60">
+            {loading ? <><Loader2 size={20} className="animate-spin" />AI添削中...</> : <><Sparkles size={20} />修正後に再度AIで添削する</>}
+          </button>
+          <p className="text-xs text-gray-400">※ Excel出力時にこの添削文も含まれます</p>
         </Card>
       )}
 

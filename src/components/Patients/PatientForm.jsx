@@ -10,13 +10,17 @@ const ADL_FIELDS = [
 export default function PatientForm() {
   const { editingPatient, patients, savePatients, navigate } = useApp();
 
-  const init = editingPatient || {
-    name: '', address: '', age: '', gender: '女性', birthDate: '',
-    type: 'fullTime', medicalHistory: '', diagnosis: '',
-    adl: { turning: '', sittingUp: '', standingUp: '', transfer: '', standing: '', walking: '' },
-    visitDays: [], visitTime: '', visitTimes: {}, startDate: '', cautions: '',
-    consentDoctor: '', consentHospital: '', careManager: '',
-  };
+  const emptyAdl = { turning: '', sittingUp: '', standingUp: '', transfer: '', standing: '', walking: '' };
+
+  const init = editingPatient
+    ? { ...editingPatient, adl: editingPatient.adl || emptyAdl }
+    : {
+        name: '', address: '', age: '', gender: '女性', birthDate: '',
+        type: 'fullTime', medicalHistory: '', diagnosis: '',
+        adl: emptyAdl,
+        visitDays: [], visitTime: '', visitTimes: {}, startDate: '', cautions: '',
+        consentDoctor: '', consentHospital: '', careManager: '',
+      };
 
   const [form, setForm] = useState(init);
   const [errors, setErrors] = useState({});
@@ -173,6 +177,15 @@ export default function PatientForm() {
             <textarea value={form.cautions} onChange={e => set('cautions', e.target.value)}
               className={textarea()} rows={3} placeholder="注意事項・禁忌など..." />
           </Field>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!form.trackBloodPressure}
+              onChange={e => set('trackBloodPressure', e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded"
+            />
+            <span className="text-sm text-gray-700">血圧を記録する（日報に血圧入力欄を表示）</span>
+          </label>
         </Section>
 
         <Section title="関連医療機関・担当者">

@@ -1,3 +1,44 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  /* ナビ・画面専用UIを非表示 */
+  nav, header, footer, .print\:hidden { display: none !important; }
+
+  /* 背景色・枠線を忠実に印刷 */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* A4設定 */
+  @page {
+    size: A4 portrait;
+    margin: 5mm 6mm;
+  }
+
+  html, body {
+    background: white !important;
+    width: 210mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 10px;
+  }
+
+  /* ルートのpadding/marginをリセット */
+  #root {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  /* 印刷シートをフル幅で表示 */
+  #print-sheet {
+    display: block !important;
+    width: 100%;
+    max-width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* セクションが途中で切れないよう */
+  .print\:block > div { page-break-inside: avoid; }
+}

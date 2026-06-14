@@ -3,7 +3,7 @@ import { streamGenerateReport } from '../../utils/anthropic';
 import { Sparkles, Loader2, RotateCcw, ClipboardCheck, FileInput } from 'lucide-react';
 import CopyButton from '../Common/CopyButton';
 
-export default function ReportAIGenerator({ patient, dailyReportList, period, reportType, apiKey, onAutoFill, experienceReport, pastReports }) {
+export default function ReportAIGenerator({ patient, dailyReportList, period, reportType, apiKey, onAutoFill, experienceReport, pastReports, target = 'company' }) {
   const [generating, setGenerating] = useState(false);
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ export default function ReportAIGenerator({ patient, dailyReportList, period, re
     setError('');
     try {
       await streamGenerateReport(
-        { patientName: patient.name, period, dailyReportList, reportType, experienceReport, pastReports },
+        { patientName: patient.name, period, dailyReportList, reportType, experienceReport, pastReports, target },
         apiKey,
         (chunk) => setOutput(prev => prev + chunk),
       );

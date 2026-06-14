@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2, XCircle, AlertTriangle } from 'lucide-react';
-import { formatDate, REPORT_LABELS } from '../../utils/helpers';
+import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2, XCircle, AlertTriangle, ClipboardList, CheckSquare, Square, ClipboardPen } from 'lucide-react';
+import { formatDate, REPORT_LABELS, generateId } from '../../utils/helpers';
 
 const ADL_LABELS = [
   ['turning', '寝返り'], ['sittingUp', '起き上り'], ['standingUp', '立ち上り'],
@@ -22,6 +22,7 @@ export default function PatientDetail() {
   const [newSpotDate, setNewSpotDate] = useState('');
   const [newSpotTime, setNewSpotTime] = useState('');
   const [newAbsentDate, setNewAbsentDate] = useState('');
+  const [newConfirmText, setNewConfirmText] = useState('');
   const [showTerminateForm, setShowTerminateForm] = useState(false);
   const [terminateReason, setTerminateReason] = useState('');
   const [terminateReasonNote, setTerminateReasonNote] = useState('');
@@ -88,6 +89,33 @@ export default function PatientDetail() {
     setShowTerminateForm(false);
   };
 
+  const addConfirmItem = () => {
+    if (!newConfirmText.trim()) return;
+    const item = { id: generateId(), text: newConfirmText.trim(), done: false, createdAt: new Date().toISOString().split('T')[0] };
+    const updated = patients.map(p =>
+      p.id === patient.id ? { ...p, confirmItems: [...(p.confirmItems || []), item] } : p
+    );
+    savePatients(updated);
+    setNewConfirmText('');
+  };
+
+  const toggleConfirmItem = (itemId) => {
+    const updated = patients.map(p => {
+      if (p.id !== patient.id) return p;
+      return { ...p, confirmItems: (p.confirmItems || []).map(item =>
+        item.id === itemId ? { ...item, done: !item.done } : item
+      )};
+    });
+    savePatients(updated);
+  };
+
+  const deleteConfirmItem = (itemId) => {
+    const updated = patients.map(p =>
+      p.id !== patient.id ? p : { ...p, confirmItems: (p.confirmItems || []).filter(item => item.id !== itemId) }
+    );
+    savePatients(updated);
+  };
+
   const handleReactivate = () => {
     const updated = patients.map(p =>
       p.id === patient.id
@@ -147,7 +175,10 @@ export default function PatientDetail() {
               patient.type === 'fullTime' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
               {patient.type === 'fullTime' ? '正社員先' : '副業先'}
             </span>
-            {patient.visitSchedule === 'spot' && (
+            {patient.isTrial && (
+              <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-100 text-amber-700">体験</span>
+            )}
+            {patient.visitSchedule === 'spot' && !patient.isTrial && (
               <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-purple-100 text-purple-700">スポット</span>
             )}
             {patient.status && (() => {
@@ -167,6 +198,68 @@ export default function PatientDetail() {
           <Edit size={15} /><span>編集</span>
         </button>
       </div>
+
+      {/* 体験終了→定期訪問に変更 */}
+      {patient.isTrial && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <p className="text-sm font-semibold text-amber-800 mb-1">体験患者として登録されています</p>
+          <p className="text-xs text-amber-600 mb-3">体験が終了して定期訪問になった場合は、下のボタンで切り替えてください。</p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                if (!confirm(`「${patient.name}」を体験から定期訪問に変更しますか？`)) return;
+                const trialDate = (patient.spotDates?.[0]?.date || patient.spotDates?.[0]) || new Date().toISOString().split('T')[0];
+                const updated = patients.map(p =>
+                  p.id === patient.id
+                    ? { ...p, isTrial: false, visitSchedule: 'regular', trialDates: p.spotDates || [], startDate: trialDate }
+                    : p
+                );
+                savePatients(updated);
+              }}
+              className="w-full py-2.5 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors"
+            >
+              体験終了 → 定期訪問に変更する
+            </button>
+            <button
+              onClick={() => {
+                if (!confirm(`「${patient.name}」を定期訪問に変更します。同意書取得まで施術を保留しますか？`)) return;
+                const trialDate = (patient.spotDates?.[0]?.date || patient.spotDates?.[0]) || new Date().toISOString().split('T')[0];
+                const updated = patients.map(p =>
+                  p.id === patient.id
+                    ? { ...p, isTrial: false, visitSchedule: 'regular', trialDates: p.spotDates || [], consentObtained: false, startDate: trialDate }
+                    : p
+                );
+                savePatients(updated);
+              }}
+              className="w-full py-2.5 bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-300 transition-colors"
+            >
+              体験終了 → 同意書取得後に開始（保留）
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 同意書未取得バナー */}
+      {!patient.isTrial && patient.consentObtained === false && (
+        <div className="bg-gray-50 border border-gray-300 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full font-bold">同意書待ち</span>
+            <p className="text-sm font-semibold text-gray-700">同意書が未取得です</p>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">同意書が取得されるまでスケジュールに「同意書待ち」と表示されます。</p>
+          <button
+            onClick={() => {
+              const updated = patients.map(p =>
+                p.id === patient.id ? { ...p, consentObtained: true } : p
+              );
+              savePatients(updated);
+            }}
+            className="w-full py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
+          >
+            ✓ 同意書取得済みにする
+          </button>
+        </div>
+      )}
 
       {/* ステータス設定 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -204,6 +297,48 @@ export default function PatientDetail() {
               className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
             <button onClick={() => setPatientStatus('other', statusNote)}
               className="px-3 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">保存</button>
+          </div>
+        )}
+      </div>
+
+      {/* 確認事項チェックリスト */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-3">
+          <ClipboardList size={16} className="text-blue-500" />確認事項
+        </div>
+        <div className="flex gap-2 mb-3">
+          <input
+            value={newConfirmText}
+            onChange={e => setNewConfirmText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addConfirmItem()}
+            placeholder="例：保険証を確認、次回同意書を持参"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <button onClick={addConfirmItem}
+            className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+            <Plus size={15} />追加
+          </button>
+        </div>
+        {(patient.confirmItems || []).length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-1">確認事項はありません</p>
+        ) : (
+          <div className="space-y-1.5">
+            {(patient.confirmItems || []).map(item => (
+              <div key={item.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl transition-colors ${item.done ? 'bg-gray-50' : 'bg-blue-50'}`}>
+                <button onClick={() => toggleConfirmItem(item.id)} className="shrink-0">
+                  {item.done
+                    ? <CheckSquare size={18} className="text-gray-400" />
+                    : <Square size={18} className="text-blue-500" />}
+                </button>
+                <span className={`flex-1 text-sm ${item.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                  {item.text}
+                </span>
+                <button onClick={() => deleteConfirmItem(item.id)}
+                  className="shrink-0 text-gray-300 hover:text-red-500 transition-colors">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -454,6 +589,26 @@ export default function PatientDetail() {
             )}
           </div>
         )}
+
+        {/* 体験問診シート */}
+        <div className="mb-2">
+          <button
+            onClick={() => navigate('trial-consultation', { patient })}
+            className="w-full flex items-center justify-between p-4 rounded-xl border bg-amber-50 border-amber-200 hover:bg-amber-100 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <ClipboardPen size={20} className="text-amber-600" />
+              <div className="text-left">
+                <div className="font-semibold text-sm text-amber-800">
+                  体験問診シート
+                  {patient.trialConsultation && <span className="ml-2 text-xs font-normal text-amber-600">入力済み</span>}
+                </div>
+                <div className="text-xs text-gray-500">初回体験時の問診・施術メモ・書類確認</div>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-gray-400" />
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 gap-2">
           {reportButtons.map(({ view, label, sub, color }) => (
