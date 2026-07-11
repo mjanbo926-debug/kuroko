@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../App';
 import { authStorage, storage } from '../../utils/storage';
-import { Key, Lock, Eye, EyeOff, Check, AlertCircle, Download, Upload, Smartphone, DatabaseBackup, Shield } from 'lucide-react';
+import { Key, Lock, Eye, EyeOff, Check, AlertCircle, Download, Upload, Smartphone, DatabaseBackup, Shield, CalendarOff, Plus, X } from 'lucide-react';
 
 const DATA_KEYS = ['patients', 'reports', 'dailyReports', 'patientDailyReports', 'scheduleOverrides'];
 
@@ -21,6 +21,22 @@ export default function Settings() {
   const [importStatus, setImportStatus] = useState(''); // '' | 'success' | 'error'
   const [importMsg, setImportMsg] = useState('');
   const fileRef = useRef();
+
+  const [holidayName, setHolidayName] = useState('');
+  const [holidayStart, setHolidayStart] = useState('');
+  const [holidayEnd, setHolidayEnd] = useState('');
+
+  const handleAddHoliday = () => {
+    if (!holidayName.trim() || !holidayStart || !holidayEnd) return;
+    if (holidayEnd < holidayStart) { alert('終了日は開始日以降にしてください'); return; }
+    const holidays = [...(settings.holidays || []), { id: Date.now().toString(), name: holidayName.trim(), start: holidayStart, end: holidayEnd }];
+    saveSettings({ ...settings, holidays });
+    setHolidayName(''); setHolidayStart(''); setHolidayEnd('');
+  };
+
+  const handleDeleteHoliday = (id) => {
+    saveSettings({ ...settings, holidays: (settings.holidays || []).filter(h => h.id !== id) });
+  };
 
   const handleSaveApiKey = () => {
     saveSettings({ ...settings, apiKey });
@@ -166,6 +182,50 @@ export default function Settings() {
             <AlertCircle size={16} />{importMsg}
           </div>
         )}
+      </div>
+
+      {/* 連休・祝日設定 */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+        <div className="flex items-center gap-2 font-semibold text-gray-700">
+          <CalendarOff size={18} className="text-rose-500" />連休・祝日設定
+        </div>
+        <p className="text-xs text-gray-400">お盆休みや年末年始など、設定した期間中はスケジュールの全患者がお休み扱いになります。</p>
+
+        {(settings.holidays || []).length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-2">設定なし</p>
+        ) : (
+          <div className="space-y-2">
+            {(settings.holidays || []).map(h => (
+              <div key={h.id} className="flex items-center justify-between bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5">
+                <div>
+                  <div className="text-sm font-semibold text-rose-800">{h.name}</div>
+                  <div className="text-xs text-rose-500">{h.start} 〜 {h.end}</div>
+                </div>
+                <button onClick={() => handleDeleteHoliday(h.id)} className="p-1.5 text-rose-400 hover:text-rose-600">
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="border-t border-gray-100 pt-3 space-y-2">
+          <p className="text-xs font-medium text-gray-500">新しい連休を追加</p>
+          <input type="text" placeholder="名称（例：お盆休み、年末年始）" value={holidayName}
+            onChange={e => setHolidayName(e.target.value)}
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+          <div className="flex items-center gap-2">
+            <input type="date" value={holidayStart} onChange={e => setHolidayStart(e.target.value)}
+              className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+            <span className="text-gray-400 shrink-0">〜</span>
+            <input type="date" value={holidayEnd} onChange={e => setHolidayEnd(e.target.value)}
+              className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+          </div>
+          <button onClick={handleAddHoliday}
+            className="w-full flex items-center justify-center gap-2 bg-rose-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-rose-600 transition-colors">
+            <Plus size={16} />追加する
+          </button>
+        </div>
       </div>
 
       {/* APIキー */}

@@ -66,7 +66,12 @@ function getEffectivePatients(patients, date, overrides) {
 }
 
 export default function ScheduleView() {
-  const { patients, dailyReports, scheduleOverrides, saveScheduleOverrides, savePatients, navigate } = useApp();
+  const { patients, dailyReports, scheduleOverrides, saveScheduleOverrides, savePatients, navigate, settings } = useApp();
+
+  const getHolidayName = (dateStr) => {
+    const holidays = settings?.holidays || [];
+    return holidays.find(h => dateStr >= h.start && dateStr <= h.end)?.name || null;
+  };
   const [weekOffset, setWeekOffset] = useState(0);
   const [filter, setFilter] = useState('all');
   const [editingDate, setEditingDate] = useState(null);
@@ -366,8 +371,9 @@ export default function ScheduleView() {
                 const isToday = date.getTime() === today.getTime();
                 const isPast = date < today;
                 const isHoliday = isJapaneseHoliday(dateStr);
+                const holidayName = getHolidayName(dateStr);
                 const dayPatients = getEffectivePatients(filteredPatients, date, scheduleOverrides);
-                const activeCount = dayPatients.filter(p =>
+                const activeCount = holidayName ? 0 : dayPatients.filter(p =>
                   !p.status &&
                   !(p.consentObtained === false && !p.isTrial && dateStr >= toDateStr(today)) &&
                   !(p.absentDates || []).includes(dateStr) &&
@@ -391,7 +397,10 @@ export default function ScheduleView() {
                         {hasReport && <span className="w-2 h-2 bg-green-400 rounded-full" title="日報済み" />}
                         {!hasReport && hasOv && <span className="w-2 h-2 bg-orange-400 rounded-full" />}
                       </div>
-                      {scheduleOverrides[dateStr]?.paidLeave && (
+                      {holidayName && (
+                        <div className="text-[10px] font-bold text-rose-700 bg-rose-100 rounded px-1 mt-0.5 truncate">{holidayName}</div>
+                      )}
+                      {!holidayName && scheduleOverrides[dateStr]?.paidLeave && (
                         <div className="text-[10px] font-bold text-yellow-700 bg-yellow-100 rounded px-1 mt-0.5">
                           {scheduleOverrides[dateStr].paidLeave.type === 'full'
                             ? '有給（終日）'
@@ -462,6 +471,7 @@ export default function ScheduleView() {
                                 </div>
                               )}
                               {!p.status && (() => {
+                                if (holidayName) return <div className="text-xs font-medium text-rose-500">お休み（{holidayName}）</div>;
                                 const absReason = (scheduleOverrides[dateStr] || {}).absences?.[p.id];
                                 const isAbsent = absReason || (p.absentDates || []).includes(dateStr);
                                 if (!isAbsent) return null;
@@ -549,8 +559,9 @@ export default function ScheduleView() {
           const isToday = date.getTime() === today.getTime();
           const isPast = date < today;
           const isHoliday = isJapaneseHoliday(dateStr);
+          const holidayNameList = getHolidayName(dateStr);
           const dayPatients = getEffectivePatients(filteredPatients, date, scheduleOverrides);
-          const listActiveCount = dayPatients.filter(p =>
+          const listActiveCount = holidayNameList ? 0 : dayPatients.filter(p =>
             !p.status &&
             !(p.consentObtained === false && !p.isTrial && dateStr >= toDateStr(today)) &&
             !(p.absentDates || []).includes(dateStr) &&
@@ -586,7 +597,10 @@ export default function ScheduleView() {
                     {hasOv && !isEditing && (
                       <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">変更あり</span>
                     )}
-                    {scheduleOverrides[dateStr]?.paidLeave && (
+                    {holidayNameList && (
+                      <span className="text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">{holidayNameList}</span>
+                    )}
+                    {!holidayNameList && scheduleOverrides[dateStr]?.paidLeave && (
                       <span className="text-xs bg-yellow-100 text-yellow-700 font-bold px-2 py-0.5 rounded-full">
                         {scheduleOverrides[dateStr].paidLeave.type === 'full'
                           ? '有給（終日）'
@@ -635,8 +649,8 @@ export default function ScheduleView() {
                       const visitRecord = dailyReport?.visits?.find(v => v.patientId === p.id);
                       const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                       const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
-                      const absenceReason = (scheduleOverrides[dateStr] || {}).absences?.[p.id];
-                      const isAbsenceTarget = absenceTarget?.patientId === p.id && absenceTarget?.dateStr === dateStr;
+                      const absenceReason = holidayNameList || (scheduleOverrides[dateStr] || {}).absences?.[p.id];
+                      const isAbsenceTarget = !holidayNameList && absenceTarget?.patientId === p.id && absenceTarget?.dateStr === dateStr;
                       return (
                         <div key={p.id} className="space-y-1.5">
                           <div className="flex items-center gap-2">
@@ -645,16 +659,18 @@ export default function ScheduleView() {
                                 timeOverride={timeOverride} absenceReason={absenceReason}
                                 onClick={() => navigate('patient-detail', { patient: p })} />
                             </div>
-                            <button
-                              onClick={() => setAbsenceTarget(isAbsenceTarget ? null : { patientId: p.id, dateStr })}
-                              className={`shrink-0 flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
-                                absenceReason
-                                  ? 'bg-orange-100 text-orange-600 hover:bg-orange-200'
-                                  : isAbsenceTarget
-                                    ? 'bg-orange-400 text-white'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-500'}`}>
-                              <Ban size={12} />{absenceReason ? '休み' : 'お休み'}
-                            </button>
+                            {!holidayNameList && (
+                              <button
+                                onClick={() => setAbsenceTarget(isAbsenceTarget ? null : { patientId: p.id, dateStr })}
+                                className={`shrink-0 flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
+                                  absenceReason
+                                    ? 'bg-orange-100 text-orange-600 hover:bg-orange-200'
+                                    : isAbsenceTarget
+                                      ? 'bg-orange-400 text-white'
+                                      : 'bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-500'}`}>
+                                <Ban size={12} />{absenceReason ? '休み' : 'お休み'}
+                              </button>
+                            )}
                           </div>
                           {isAbsenceTarget && (
                             <div className="flex gap-2 flex-wrap ml-1">
