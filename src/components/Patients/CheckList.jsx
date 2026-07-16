@@ -92,40 +92,43 @@ export default function CheckList() {
 function PrintSheet({ patients, items }) {
   const today = new Date();
   const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
-  const colW = items.length > 0 ? Math.min(60, Math.floor(140 / items.length)) : 60;
+  const colW = items.length > 0 ? Math.min(80, Math.floor(180 / items.length)) : 80;
+
+  // A4印刷可能高さ(297mm - 余白16mm) - タイトル(14mm) - ヘッダ行(12mm) = 255mm を行数で割る
+  const rowH = `${Math.floor(255 / Math.max(patients.length, 1))}mm`;
 
   return (
-    <div style={{ fontFamily: 'sans-serif', color: '#111', fontSize: '10px' }}>
+    <div style={{ fontFamily: 'sans-serif', color: '#111' }}>
       {/* タイトル */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '6px' }}>
-        <div style={{ fontSize: '14px', fontWeight: 'bold' }}>確認チェックリスト　正社員先</div>
-        <div style={{ fontSize: '10px', color: '#555' }}>印刷日：{dateStr}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>確認チェックリスト　正社員先</div>
+        <div style={{ fontSize: '12px', color: '#555' }}>印刷日：{dateStr}</div>
       </div>
 
       {/* テーブル */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', tableLayout: 'fixed' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
         <thead>
-          <tr>
-            <th style={thStyle({ width: '26px' })}>No.</th>
+          <tr style={{ height: '12mm' }}>
+            <th style={thStyle({ width: '28px' })}>No.</th>
             <th style={thStyle({})}>患者名</th>
-            <th style={thStyle({ width: '52px' })}>訪問曜日</th>
+            <th style={thStyle({ width: '60px' })}>訪問曜日</th>
             {items.map((item, i) => (
               <th key={i} style={thStyle({ width: `${colW}px`, textAlign: 'center' })}>{item}</th>
             ))}
-            <th style={thStyle({ width: '72px', textAlign: 'center' })}>備考</th>
+            <th style={thStyle({ width: '90px', textAlign: 'center' })}>備考</th>
           </tr>
         </thead>
         <tbody>
           {patients.map((p, i) => (
-            <tr key={p.id} style={{ background: i % 2 === 0 ? '#fff' : '#f5f5f5' }}>
+            <tr key={p.id} style={{ background: i % 2 === 0 ? '#fff' : '#f5f5f5', height: rowH }}>
               <td style={tdStyle({ textAlign: 'center', color: '#888' })}>{i + 1}</td>
               <td style={tdStyle({ fontWeight: '600', overflow: 'hidden', whiteSpace: 'nowrap' })}>{p.name}</td>
-              <td style={tdStyle({ textAlign: 'center', color: '#555', fontSize: '9px' })}>
+              <td style={tdStyle({ textAlign: 'center', color: '#555' })}>
                 {Array.isArray(p.visitDays) ? p.visitDays.join('・') : (p.visitDays || '')}
               </td>
               {items.map((_, j) => (
                 <td key={j} style={tdStyle({ textAlign: 'center' })}>
-                  <div style={{ width: '14px', height: '14px', border: '1.5px solid #333', margin: '0 auto', borderRadius: '2px' }} />
+                  <div style={{ width: '18px', height: '18px', border: '2px solid #333', margin: '0 auto', borderRadius: '2px' }} />
                 </td>
               ))}
               <td style={tdStyle({})} />
@@ -133,27 +136,24 @@ function PrintSheet({ patients, items }) {
           ))}
         </tbody>
       </table>
-
-      <div style={{ marginTop: '8px', fontSize: '9px', color: '#bbb' }}>
-        ※このリストは訪問マッサージ業務管理アプリから出力されました
-      </div>
     </div>
   );
 }
 
 const thStyle = (extra = {}) => ({
-  border: '1px solid #888',
-  padding: '4px 6px',
+  border: '1.5px solid #888',
+  padding: '6px 8px',
   background: '#e0e0e0',
   fontWeight: '700',
   textAlign: 'left',
-  fontSize: '10px',
+  fontSize: '13px',
   ...extra,
 });
 
 const tdStyle = (extra = {}) => ({
   border: '1px solid #bbb',
-  padding: '4px 6px',
-  fontSize: '10px',
+  padding: '4px 8px',
+  fontSize: '13px',
+  verticalAlign: 'middle',
   ...extra,
 });
