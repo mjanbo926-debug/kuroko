@@ -28,7 +28,7 @@ export default function CheckList() {
         @media print {
           #screen-ui { display: none !important; }
           #print-sheet { display: block !important; }
-          @page { size: A4 portrait; margin: 12mm 15mm; }
+          @page { size: A4 portrait; margin: 8mm 10mm; }
           body { margin: 0; }
         }
         #print-sheet { display: none; }
@@ -92,55 +92,40 @@ export default function CheckList() {
 function PrintSheet({ patients, items }) {
   const today = new Date();
   const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
-
-  const colW = items.length > 0 ? Math.min(72, Math.floor(160 / items.length)) : 72;
+  const colW = items.length > 0 ? Math.min(60, Math.floor(140 / items.length)) : 60;
 
   return (
-    <div style={{ fontFamily: 'sans-serif', color: '#111' }}>
+    <div style={{ fontFamily: 'sans-serif', color: '#111', fontSize: '10px' }}>
       {/* タイトル */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <div style={{ fontSize: '17px', fontWeight: 'bold' }}>確認チェックリスト　正社員先</div>
-        <div style={{ fontSize: '11px', color: '#555' }}>印刷日：{dateStr}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 'bold' }}>確認チェックリスト　正社員先</div>
+        <div style={{ fontSize: '10px', color: '#555' }}>印刷日：{dateStr}</div>
       </div>
 
       {/* テーブル */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', tableLayout: 'fixed' }}>
         <thead>
           <tr>
-            <th style={thStyle({ width: '32px' })}>No.</th>
+            <th style={thStyle({ width: '26px' })}>No.</th>
             <th style={thStyle({})}>患者名</th>
-            <th style={thStyle({ width: '60px' })}>訪問曜日</th>
+            <th style={thStyle({ width: '52px' })}>訪問曜日</th>
             {items.map((item, i) => (
               <th key={i} style={thStyle({ width: `${colW}px`, textAlign: 'center' })}>{item}</th>
             ))}
-            <th style={thStyle({ width: '80px', textAlign: 'center' })}>備考</th>
+            <th style={thStyle({ width: '72px', textAlign: 'center' })}>備考</th>
           </tr>
         </thead>
         <tbody>
           {patients.map((p, i) => (
-            <tr key={p.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f8f8' }}>
+            <tr key={p.id} style={{ background: i % 2 === 0 ? '#fff' : '#f5f5f5' }}>
               <td style={tdStyle({ textAlign: 'center', color: '#888' })}>{i + 1}</td>
-              <td style={tdStyle({ fontWeight: '600' })}>{p.name}</td>
-              <td style={tdStyle({ textAlign: 'center', color: '#555' })}>
+              <td style={tdStyle({ fontWeight: '600', overflow: 'hidden', whiteSpace: 'nowrap' })}>{p.name}</td>
+              <td style={tdStyle({ textAlign: 'center', color: '#555', fontSize: '9px' })}>
                 {Array.isArray(p.visitDays) ? p.visitDays.join('・') : (p.visitDays || '')}
               </td>
               {items.map((_, j) => (
                 <td key={j} style={tdStyle({ textAlign: 'center' })}>
-                  <div style={{ width: '18px', height: '18px', border: '2px solid #333', margin: '0 auto', borderRadius: '2px' }} />
-                </td>
-              ))}
-              <td style={tdStyle({})} />
-            </tr>
-          ))}
-          {/* 余白行 */}
-          {patients.length < 5 && Array.from({ length: 5 - patients.length }).map((_, i) => (
-            <tr key={`empty-${i}`}>
-              <td style={tdStyle({ color: '#ccc', textAlign: 'center' })}>{patients.length + i + 1}</td>
-              <td style={tdStyle({})} />
-              <td style={tdStyle({})} />
-              {items.map((_, j) => (
-                <td key={j} style={tdStyle({ textAlign: 'center' })}>
-                  <div style={{ width: '18px', height: '18px', border: '2px solid #ccc', margin: '0 auto', borderRadius: '2px' }} />
+                  <div style={{ width: '14px', height: '14px', border: '1.5px solid #333', margin: '0 auto', borderRadius: '2px' }} />
                 </td>
               ))}
               <td style={tdStyle({})} />
@@ -149,7 +134,7 @@ function PrintSheet({ patients, items }) {
         </tbody>
       </table>
 
-      <div style={{ marginTop: '14px', fontSize: '10px', color: '#999' }}>
+      <div style={{ marginTop: '8px', fontSize: '9px', color: '#bbb' }}>
         ※このリストは訪問マッサージ業務管理アプリから出力されました
       </div>
     </div>
@@ -157,18 +142,18 @@ function PrintSheet({ patients, items }) {
 }
 
 const thStyle = (extra = {}) => ({
-  border: '1.5px solid #888',
-  padding: '7px 8px',
-  background: '#e8e8e8',
+  border: '1px solid #888',
+  padding: '4px 6px',
+  background: '#e0e0e0',
   fontWeight: '700',
   textAlign: 'left',
-  fontSize: '11px',
+  fontSize: '10px',
   ...extra,
 });
 
 const tdStyle = (extra = {}) => ({
   border: '1px solid #bbb',
-  padding: '8px',
-  fontSize: '12px',
+  padding: '4px 6px',
+  fontSize: '10px',
   ...extra,
 });
