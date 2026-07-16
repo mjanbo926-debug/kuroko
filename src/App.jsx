@@ -6,6 +6,7 @@ import PatientForm from './components/Patients/PatientForm';
 import PatientDetail from './components/Patients/PatientDetail';
 import PatientDailyReportForm from './components/Patients/PatientDailyReportForm';
 import TrialConsultationSheet from './components/Patients/TrialConsultationSheet';
+import CheckList from './components/Patients/CheckList';
 import FullTimeExperienceReport from './components/Reports/FullTimeExperienceReport';
 import FullTimeMonthlyReport from './components/Reports/FullTimeMonthlyReport';
 import PartTimeExperienceReport from './components/Reports/PartTimeExperienceReport';
@@ -72,6 +73,7 @@ export default function App() {
     'patient-detail': <PatientDetail />,
     'patient-daily-report': <PatientDailyReportForm />,
     'trial-consultation': <TrialConsultationSheet />,
+    'check-list': <CheckList />,
     'report-ft-experience': <FullTimeExperienceReport />,
     'report-ft-monthly': <FullTimeMonthlyReport />,
     'report-pt-experience': <PartTimeExperienceReport />,

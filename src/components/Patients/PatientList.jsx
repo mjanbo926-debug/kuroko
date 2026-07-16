@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { Plus, Search, User, MapPin, Calendar, CheckCircle2, Clock } from 'lucide-react';
+import { Plus, Search, User, MapPin, Calendar, CheckCircle2, Clock, ClipboardList } from 'lucide-react';
 
 export default function PatientList() {
   const { patients, reports, navigate } = useApp();
@@ -53,6 +53,15 @@ export default function PatientList() {
           onChange={(e) => setQuery(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
       </div>
+
+      {/* 確認チェックリスト印刷ボタン（正社員先のみ） */}
+      {tab === 'fullTime' && (
+        <button
+          onClick={() => navigate('check-list')}
+          className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors mb-1">
+          <ClipboardList size={16} />確認チェックリストを印刷
+        </button>
+      )}
 
       {/* 月次報告書ステータスサマリー（正社員先のみ） */}
       {tab === 'fullTime' && filtered.length > 0 && (() => {
