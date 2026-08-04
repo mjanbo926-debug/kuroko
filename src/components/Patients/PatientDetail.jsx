@@ -261,45 +261,8 @@ export default function PatientDetail() {
         </div>
       )}
 
-      {/* ステータス設定 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-3">
-          <BedDouble size={16} className="text-gray-400" />状態
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {STATUS_OPTIONS.map(opt => {
-            const active = patient.status === opt.value;
-            const colors = {
-              yellow: active ? 'bg-yellow-400 text-white' : 'bg-yellow-50 text-yellow-700 border border-yellow-200',
-              red: active ? 'bg-red-500 text-white' : 'bg-red-50 text-red-700 border border-red-200',
-              gray: active ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-600 border border-gray-200',
-            };
-            return (
-              <button key={opt.value} onClick={() => {
-                if (active) { setPatientStatus(''); setStatusNote(''); }
-                else { setPatientStatus(opt.value, opt.value === 'other' ? statusNote : ''); }
-              }} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${colors[opt.color]}`}>
-                {active ? `✓ ${opt.label}` : opt.label}
-              </button>
-            );
-          })}
-          {patient.status && (
-            <button onClick={() => { setPatientStatus(''); setStatusNote(''); }}
-              className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-red-500 transition-colors">
-              解除
-            </button>
-          )}
-        </div>
-        {patient.status === 'other' && (
-          <div className="mt-2 flex gap-2">
-            <input value={statusNote} onChange={e => setStatusNote(e.target.value)}
-              placeholder="メモ（例：外出中、コロナ療養中）"
-              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <button onClick={() => setPatientStatus('other', statusNote)}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">保存</button>
-          </div>
-        )}
-      </div>
+      {/* 入院管理 */}
+      <HospitalizationPanel patient={patient} patients={patients} savePatients={savePatients} />
 
       {/* 確認事項チェックリスト */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -743,6 +706,68 @@ export default function PatientDetail() {
                 施術終了として記録する
               </button>
             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HospitalizationPanel({ patient, patients, savePatients }) {
+  const [fromDate, setFromDate] = useState(patient.hospitalizedFrom || '');
+  const [untilDate, setUntilDate] = useState(patient.hospitalizedUntil || '');
+
+  const save = (hospitalized, from, until) => {
+    const updated = patients.map(p =>
+      p.id !== patient.id ? p : {
+        ...p,
+        hospitalized,
+        hospitalizedFrom: from || undefined,
+        hospitalizedUntil: until || undefined,
+      }
+    );
+    savePatients(updated);
+  };
+
+  const isHospitalized = !!patient.hospitalized;
+
+  return (
+    <div className={`rounded-2xl shadow-sm border p-4 ${isHospitalized ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600">
+          <BedDouble size={16} className={isHospitalized ? 'text-red-500' : 'text-gray-400'} />
+          入院管理
+          {isHospitalized && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">入院中</span>}
+        </div>
+        {isHospitalized ? (
+          <button
+            onClick={() => { save(false, '', ''); setFromDate(''); setUntilDate(''); }}
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors">解除</button>
+        ) : (
+          <button
+            onClick={() => { save(true, fromDate || new Date().toISOString().split('T')[0], ''); setFromDate(f => f || new Date().toISOString().split('T')[0]); }}
+            className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-medium hover:bg-red-200 transition-colors">
+            入院を記録する
+          </button>
+        )}
+      </div>
+      {isHospitalized && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-20 shrink-0">入院開始日</span>
+            <input type="date" value={fromDate}
+              onChange={e => { setFromDate(e.target.value); save(true, e.target.value, untilDate); }}
+              className="flex-1 px-3 py-2 border border-red-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-300" />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-20 shrink-0">退院・再開日</span>
+            <input type="date" value={untilDate}
+              onChange={e => { setUntilDate(e.target.value); save(true, fromDate, e.target.value); }}
+              placeholder="入院継続中は空欄"
+              className="flex-1 px-3 py-2 border border-red-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-300" />
+          </div>
+          {untilDate && (
+            <p className="text-xs text-green-600 font-medium pt-1">{untilDate.replace(/-/g, '/')}より施術再開</p>
           )}
         </div>
       )}
