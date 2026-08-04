@@ -72,6 +72,14 @@ export default function ScheduleView() {
     const holidays = settings?.holidays || [];
     return holidays.find(h => dateStr >= h.start && dateStr <= h.end)?.name || null;
   };
+
+  // 指定日に入院中かどうかチェック（入院中: true, 退院済み: false）
+  const isPatientHospitalized = (p, dateStr) => {
+    if (!p.hospitalized || !p.hospitalizedFrom) return false;
+    if (dateStr < p.hospitalizedFrom) return false;
+    if (p.hospitalizedUntil && dateStr > p.hospitalizedUntil) return false;
+    return true;
+  };
   const [weekOffset, setWeekOffset] = useState(0);
   const [filter, setFilter] = useState('all');
   const [editingDate, setEditingDate] = useState(null);
@@ -465,12 +473,13 @@ export default function ScheduleView() {
                                   {time ? `${time}${timeOverride ? ' ★' : ''}` : <span className="text-gray-300">- 時間</span>}
                                 </div>
                               )}
-                              {p.status && (
+                              {isPatientHospitalized(p, dateStr) ? (
+                                <div className="text-xs font-medium text-red-500">入院中</div>
+                              ) : p.status ? (
                                 <div className={`text-xs font-medium ${p.status === 'hospitalized' ? 'text-red-500' : 'text-gray-500'}`}>
                                   {p.status === 'hospitalized' ? '入院中' : p.statusNote || 'その他'}
                                 </div>
-                              )}
-                              {!p.status && (() => {
+                              ) : (() => {
                                 if (holidayName) return <div className="text-xs font-medium text-rose-500">お休み（{holidayName}）</div>;
                                 const absReason = (scheduleOverrides[dateStr] || {}).absences?.[p.id];
                                 const isAbsent = absReason || (p.absentDates || []).includes(dateStr);
@@ -649,8 +658,9 @@ export default function ScheduleView() {
                       const visitRecord = dailyReport?.visits?.find(v => v.patientId === p.id);
                       const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                       const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
-                      const absenceReason = holidayNameList || (scheduleOverrides[dateStr] || {}).absences?.[p.id];
-                      const isAbsenceTarget = !holidayNameList && absenceTarget?.patientId === p.id && absenceTarget?.dateStr === dateStr;
+                      const hospitalizedNow = isPatientHospitalized(p, dateStr);
+                      const absenceReason = hospitalizedNow ? '入院中' : holidayNameList || (scheduleOverrides[dateStr] || {}).absences?.[p.id];
+                      const isAbsenceTarget = !holidayNameList && !hospitalizedNow && absenceTarget?.patientId === p.id && absenceTarget?.dateStr === dateStr;
                       return (
                         <div key={p.id} className="space-y-1.5">
                           <div className="flex items-center gap-2">
@@ -659,7 +669,7 @@ export default function ScheduleView() {
                                 timeOverride={timeOverride} absenceReason={absenceReason}
                                 onClick={() => navigate('patient-detail', { patient: p })} />
                             </div>
-                            {!holidayNameList && (
+                            {!holidayNameList && !hospitalizedNow && (
                               <button
                                 onClick={() => setAbsenceTarget(isAbsenceTarget ? null : { patientId: p.id, dateStr })}
                                 className={`shrink-0 flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${

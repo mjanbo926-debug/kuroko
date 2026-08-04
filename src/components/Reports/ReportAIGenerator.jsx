@@ -18,7 +18,8 @@ export default function ReportAIGenerator({ patient, dailyReportList, period, re
     setError('');
     try {
       await streamGenerateReport(
-        { patientName: patient.name, period, dailyReportList, reportType, experienceReport, pastReports, target },
+        { patientName: patient.name, period, dailyReportList, reportType, experienceReport, pastReports, target,
+          hospitalizedFrom: patient.hospitalizedFrom, hospitalizedUntil: patient.hospitalizedUntil },
         apiKey,
         (chunk) => setOutput(prev => prev + chunk),
       );

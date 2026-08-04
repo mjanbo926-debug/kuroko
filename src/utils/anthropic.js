@@ -210,7 +210,7 @@ ${reportsText}
   return JSON.parse(match[0]);
 }
 
-export async function streamGenerateReport({ patientName, period, dailyReportList, reportType, experienceReport, pastReports, target = 'company' }, apiKey, onChunk) {
+export async function streamGenerateReport({ patientName, period, dailyReportList, reportType, experienceReport, pastReports, target = 'company', hospitalizedFrom, hospitalizedUntil }, apiKey, onChunk) {
   const key = (apiKey || '').trim();
   if (!key) throw new Error('APIキーが設定されていません。設定画面でAnthropicのAPIキーを入力してください。');
 
@@ -319,9 +319,20 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
     }
   }
 
+  // 入院情報の組み立て
+  const hospitalizationNote = (() => {
+    if (!hospitalizedFrom) return '';
+    const fromFmt = hospitalizedFrom.replace(/-/g, '/');
+    if (hospitalizedUntil) {
+      const untilFmt = hospitalizedUntil.replace(/-/g, '/');
+      return `\n\n【入院・施術休止情報】\n${fromFmt}より入院のため施術休止。${untilFmt}に退院・施術再開。`;
+    }
+    return `\n\n【入院・施術休止情報】\n${fromFmt}より入院中のため、それ以降の施術は休止。現在も入院継続中。`;
+  })();
+
   const typeLabel = reportType === 'monthly' ? '月次' : '半年次';
   const prompt = `以下は${patientName}様の${period}の施術記録です（${count}回分）。
-これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書を作成してください。${additionalContext}
+これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書を作成してください。${additionalContext}${hospitalizationNote}
 
 【施術サマリー】
 - 施術回数：${count}回${topParts.length ? `\n- 主な施術部位：${topParts.join('・')}` : ''}${topTreats.length ? `\n- 主な施術内容：${topTreats.join('・')}` : ''}${topCondition ? `\n- 全体的な状態傾向：${topCondition}` : ''}
@@ -340,6 +351,11 @@ ${formatSection}
 - 各項目の見出しの後に改行して本文を記述すること
 - 余分な前置き・後書き・説明は不要
 ${reportType === 'sixmonth' && additionalContext ? '- 体験カルテの主訴・目標と現在の状況を比較し変化・進捗を反映すること\n- 過去の報告書がある場合は前回との変化・継続点を意識して記述すること' : ''}
+${hospitalizationNote ? `- 入院情報が含まれる場合：
+  　・施術記録は入院前の期間のみに基づいて記述すること
+  　・入院開始日と入院の事実を報告書内に明記すること
+  　・現在入院継続中の場合、締め文は「退院後は主治医のご判断のもと、施術再開を検討してまいりたいと思います」のように再開未定の表現にすること
+  　・退院・施術再開済みの場合、退院日と再開した旨を明記すること` : ''}
 
 【文章品質ルール（厳守）】
 - 文末表現の重複禁止：以下の表現を組み合わせて使い、同じものを2文以上連続させない

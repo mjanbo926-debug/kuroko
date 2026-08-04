@@ -186,6 +186,34 @@ export default function PatientForm() {
             />
             <span className="text-sm text-gray-700">血圧を記録する（日報に血圧入力欄を表示）</span>
           </label>
+          <div className="pt-1 space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!form.hospitalized}
+                onChange={e => {
+                  set('hospitalized', e.target.checked);
+                  if (!e.target.checked) set('hospitalizedUntil', '');
+                }}
+                className="w-4 h-4 text-red-500 rounded"
+              />
+              <span className="text-sm text-gray-700">入院中・入院歴あり</span>
+            </label>
+            {form.hospitalized && (
+              <div className="pl-7 space-y-2">
+                <Field label="入院開始日">
+                  <input type="date" value={form.hospitalizedFrom || ''}
+                    onChange={e => set('hospitalizedFrom', e.target.value)}
+                    className={input()} />
+                </Field>
+                <Field label="退院日（施術再開日）">
+                  <input type="date" value={form.hospitalizedUntil || ''}
+                    onChange={e => set('hospitalizedUntil', e.target.value)}
+                    className={input()} placeholder="入院継続中は空欄" />
+                </Field>
+              </div>
+            )}
+          </div>
         </Section>
 
         <Section title="関連医療機関・担当者">
