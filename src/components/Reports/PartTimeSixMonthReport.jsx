@@ -8,7 +8,7 @@ import ReportAIGenerator from './ReportAIGenerator';
 
 const POSITIONS = ['仰臥位', '右側臥位', '左側臥位', '腹臥位', '座位', '立位'];
 
-const TREATMENT_TAGS = ['マッサージ', 'ストレッチ', '関節可動域訓練', '運動療法', '歩行訓練', 'ローラー鍼'];
+const TREATMENT_TAGS = ['マッサージ', 'ストレッチ', '関節可動域訓練', '運動療法', '歩行訓練', 'ローラー鍼', '鍼治療'];
 
 const REPORT_FIELDS = [
   ['initialStatus', '施術開始時の状況', '施術開始時の身体・生活状況を記入...', 3],
