@@ -7,7 +7,7 @@ const DAYS = ['月', '火', '水', '木', '金', '土', '日'];
 const JS_DAY_TO_IDX = [6, 0, 1, 2, 3, 4, 5];
 
 const BODY_PARTS = ['腰部', '頸部', '下肢', '肩部', '上肢', '背部', '腹部'];
-const TREATMENT_TAGS = ['マッサージ', 'ストレッチ', '関節可動域訓練', '運動療法', '歩行訓練', 'ローラー鍼'];
+const TREATMENT_TAGS = ['マッサージ', 'ストレッチ', '関節可動域訓練', '運動療法', '歩行訓練', 'ローラー鍼', '鍼治療'];
 const CONDITION_OPTIONS = ['改善傾向', '変化なし', 'やや悪化', '悪化', '好調'];
 
 function getDayLabel(dateStr) {
