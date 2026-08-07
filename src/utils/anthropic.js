@@ -210,7 +210,7 @@ ${reportsText}
   return JSON.parse(match[0]);
 }
 
-export async function streamGenerateReport({ patientName, period, dailyReportList, reportType, experienceReport, pastReports, target = 'company', hospitalizedFrom, hospitalizedUntil }, apiKey, onChunk) {
+export async function streamGenerateReport({ patientName, period, dailyReportList, reportType, experienceReport, pastReports, target = 'company', hospitalizedFrom, hospitalizedUntil, emergencyTransports }, apiKey, onChunk) {
   const key = (apiKey || '').trim();
   if (!key) throw new Error('APIキーが設定されていません。設定画面でAnthropicのAPIキーを入力してください。');
 
@@ -319,6 +319,16 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
     }
   }
 
+  // 救急搬送情報の組み立て
+  const emergencyNote = (() => {
+    if (!emergencyTransports?.length) return '';
+    const lines = emergencyTransports
+      .filter(e => e.date >= (period.split('〜')[0] || '') || true)
+      .map(e => `・${e.date.replace(/-/g, '/')}　${e.note || ''}`)
+      .join('\n');
+    return `\n\n【救急搬送記録】\n${lines}\n※報告書内に救急搬送の事実を明記すること。`;
+  })();
+
   // 入院情報の組み立て
   const hospitalizationNote = (() => {
     if (!hospitalizedFrom) return '';
@@ -332,7 +342,7 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
 
   const typeLabel = reportType === 'monthly' ? '月次' : '半年次';
   const prompt = `以下は${patientName}様の${period}の施術記録です（${count}回分）。
-これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書を作成してください。${additionalContext}${hospitalizationNote}
+これをもとに、主治医・ケアマネジャー・介護事業所に提出する${typeLabel}施術報告書を作成してください。${additionalContext}${emergencyNote}${hospitalizationNote}
 
 【施術サマリー】
 - 施術回数：${count}回${topParts.length ? `\n- 主な施術部位：${topParts.join('・')}` : ''}${topTreats.length ? `\n- 主な施術内容：${topTreats.join('・')}` : ''}${topCondition ? `\n- 全体的な状態傾向：${topCondition}` : ''}

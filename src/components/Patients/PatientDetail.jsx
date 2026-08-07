@@ -22,6 +22,8 @@ export default function PatientDetail() {
   const [newSpotDate, setNewSpotDate] = useState('');
   const [newSpotTime, setNewSpotTime] = useState('');
   const [newAbsentDate, setNewAbsentDate] = useState('');
+  const [newEmergencyDate, setNewEmergencyDate] = useState('');
+  const [newEmergencyNote, setNewEmergencyNote] = useState('');
   const [newConfirmText, setNewConfirmText] = useState('');
   const [showTerminateForm, setShowTerminateForm] = useState(false);
   const [terminateReason, setTerminateReason] = useState('');
@@ -71,6 +73,24 @@ export default function PatientDetail() {
   const removeAbsentDate = (date) => {
     const updated = patients.map(p =>
       p.id === patient.id ? { ...p, absentDates: (p.absentDates || []).filter(d => d !== date) } : p
+    );
+    savePatients(updated);
+  };
+
+  const addEmergency = () => {
+    if (!newEmergencyDate) return;
+    const current = patient.emergencyTransports || [];
+    const entry = { date: newEmergencyDate, note: newEmergencyNote.trim() };
+    const sorted = [...current, entry].sort((a, b) => a.date.localeCompare(b.date));
+    const updated = patients.map(p => p.id === patient.id ? { ...p, emergencyTransports: sorted } : p);
+    savePatients(updated);
+    setNewEmergencyDate('');
+    setNewEmergencyNote('');
+  };
+
+  const removeEmergency = (date) => {
+    const updated = patients.map(p =>
+      p.id === patient.id ? { ...p, emergencyTransports: (p.emergencyTransports || []).filter(e => e.date !== date) } : p
     );
     savePatients(updated);
   };
@@ -298,6 +318,43 @@ export default function PatientDetail() {
                 </span>
                 <button onClick={() => deleteConfirmItem(item.id)}
                   className="shrink-0 text-gray-300 hover:text-red-500 transition-colors">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 救急搬送記録 */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-3">
+          <AlertCircle size={16} className="text-red-500" />救急搬送記録
+        </div>
+        <div className="space-y-2 mb-3">
+          <div className="flex gap-2">
+            <input type="date" value={newEmergencyDate} onChange={e => setNewEmergencyDate(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+            <button onClick={addEmergency}
+              className="flex items-center gap-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors">
+              <Plus size={15} />追加
+            </button>
+          </div>
+          <input type="text" value={newEmergencyNote} onChange={e => setNewEmergencyNote(e.target.value)}
+            placeholder="状況メモ（例：転倒による骨折、意識障害など）"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+        </div>
+        {(patient.emergencyTransports || []).length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-1">登録されていません</p>
+        ) : (
+          <div className="space-y-1.5">
+            {(patient.emergencyTransports || []).map(e => (
+              <div key={e.date} className="flex items-center justify-between px-3 py-2 bg-red-50 rounded-xl">
+                <div>
+                  <span className="text-sm font-medium text-gray-700">{e.date.replace(/-/g, '/')}</span>
+                  {e.note && <span className="text-xs text-gray-500 ml-2">{e.note}</span>}
+                </div>
+                <button onClick={() => removeEmergency(e.date)} className="text-gray-300 hover:text-red-500 transition-colors">
                   <Trash2 size={15} />
                 </button>
               </div>
