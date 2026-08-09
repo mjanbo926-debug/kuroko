@@ -323,10 +323,10 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
   const emergencyNote = (() => {
     if (!emergencyTransports?.length) return '';
     const lines = emergencyTransports
-      .filter(e => e.date >= (period.split('〜')[0] || '') || true)
       .map(e => `・${e.date.replace(/-/g, '/')}　${e.note || ''}`)
       .join('\n');
-    return `\n\n【救急搬送記録】\n${lines}\n※報告書内に救急搬送の事実を明記すること。`;
+    const hasHospitalization = !!hospitalizedFrom;
+    return `\n\n【救急搬送記録】\n${lines}\n※搬送の事実は報告書に必ず明記すること。${hasHospitalization ? '' : '搬送後に入院したか帰宅したか現時点では不明なため、「救急搬送された」という事実のみを記載し、その後の状況については断定しないこと。'}`;
   })();
 
   // 入院情報の組み立て
