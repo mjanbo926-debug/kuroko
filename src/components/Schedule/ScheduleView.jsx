@@ -383,6 +383,7 @@ export default function ScheduleView() {
                 const dayPatients = getEffectivePatients(filteredPatients, date, scheduleOverrides);
                 const activeCount = holidayName ? 0 : dayPatients.filter(p =>
                   !p.status &&
+                  !isPatientHospitalized(p, dateStr) &&
                   !(p.consentObtained === false && !p.isTrial && dateStr >= toDateStr(today)) &&
                   !(p.absentDates || []).includes(dateStr) &&
                   !(scheduleOverrides[dateStr] || {}).absences?.[p.id] &&
@@ -532,6 +533,7 @@ export default function ScheduleView() {
         const todayDateStr = toDateStr(todayDate);
         const todayActiveCount = todayPatients.filter(p =>
           !p.status &&
+          !isPatientHospitalized(p, todayDateStr) &&
           !(p.consentObtained === false && !p.isTrial) &&
           !(p.absentDates || []).includes(todayDateStr) &&
           !(scheduleOverrides[todayDateStr] || {}).absences?.[p.id] &&
@@ -572,6 +574,7 @@ export default function ScheduleView() {
           const dayPatients = getEffectivePatients(filteredPatients, date, scheduleOverrides);
           const listActiveCount = holidayNameList ? 0 : dayPatients.filter(p =>
             !p.status &&
+            !isPatientHospitalized(p, dateStr) &&
             !(p.consentObtained === false && !p.isTrial && dateStr >= toDateStr(today)) &&
             !(p.absentDates || []).includes(dateStr) &&
             !(scheduleOverrides[dateStr] || {}).absences?.[p.id] &&
