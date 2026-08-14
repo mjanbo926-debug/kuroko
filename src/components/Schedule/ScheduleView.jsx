@@ -77,7 +77,7 @@ export default function ScheduleView() {
   const isPatientHospitalized = (p, dateStr) => {
     if (!p.hospitalized || !p.hospitalizedFrom) return false;
     if (dateStr < p.hospitalizedFrom) return false;
-    if (p.hospitalizedUntil && dateStr > p.hospitalizedUntil) return false;
+    if (p.hospitalizedUntil && dateStr >= p.hospitalizedUntil) return false;
     return true;
   };
   const [weekOffset, setWeekOffset] = useState(0);
