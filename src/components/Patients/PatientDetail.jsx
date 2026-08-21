@@ -24,6 +24,8 @@ export default function PatientDetail() {
   const [newAbsentDate, setNewAbsentDate] = useState('');
   const [newEmergencyDate, setNewEmergencyDate] = useState('');
   const [newEmergencyNote, setNewEmergencyNote] = useState('');
+  const [showOldAbsent, setShowOldAbsent] = useState(false);
+  const [showOldSpot, setShowOldSpot] = useState(false);
   const [newConfirmText, setNewConfirmText] = useState('');
   const [showTerminateForm, setShowTerminateForm] = useState(false);
   const [terminateReason, setTerminateReason] = useState('');
@@ -376,20 +378,39 @@ export default function PatientDetail() {
             <Plus size={15} />追加
           </button>
         </div>
-        {(patient.absentDates || []).length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-1">登録されていません</p>
-        ) : (
-          <div className="space-y-1.5">
-            {(patient.absentDates || []).map(d => (
-              <div key={d} className="flex items-center justify-between px-3 py-2 bg-orange-50 rounded-xl">
-                <span className="text-sm text-gray-700">{d.replace(/-/g, '/')}</span>
-                <button onClick={() => removeAbsentDate(d)} className="text-gray-300 hover:text-red-500 transition-colors">
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        {(() => {
+          const now = new Date();
+          const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const nextMonth = `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}`.replace(/-13$/, `${now.getFullYear() + 1}-01`);
+          const all = patient.absentDates || [];
+          const visible = all.filter(d => d.slice(0, 7) === thisMonth || d.slice(0, 7) === nextMonth);
+          const old = all.filter(d => d.slice(0, 7) !== thisMonth && d.slice(0, 7) !== nextMonth);
+          if (all.length === 0) return <p className="text-xs text-gray-400 text-center py-1">登録されていません</p>;
+          return (
+            <div className="space-y-1.5">
+              {visible.map(d => (
+                <div key={d} className="flex items-center justify-between px-3 py-2 bg-orange-50 rounded-xl">
+                  <span className="text-sm text-gray-700">{d.replace(/-/g, '/')}</span>
+                  <button onClick={() => removeAbsentDate(d)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {old.length > 0 && (
+                <>
+                  <button onClick={() => setShowOldAbsent(v => !v)}
+                    className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 py-1">
+                    {showOldAbsent ? '▲' : '▼'} それ以外（{old.length}件）
+                  </button>
+                  {showOldAbsent && old.map(d => (
+                    <div key={d} className="flex items-center justify-between px-3 py-2 bg-orange-50 rounded-xl opacity-60">
+                      <span className="text-sm text-gray-700">{d.replace(/-/g, '/')}</span>
+                      <button onClick={() => removeAbsentDate(d)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* スポット患者の訪問予定日 */}
@@ -408,24 +429,45 @@ export default function PatientDetail() {
               <Plus size={15} />追加
             </button>
           </div>
-          {(patient.spotDates || []).length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-2">予定日が登録されていません</p>
-          ) : (
-            <div className="space-y-1.5">
-              {(patient.spotDates || []).map(s => {
-                const d = s.date || s;
-                const t = s.time || '';
-                return (
-                  <div key={d} className="flex items-center justify-between px-3 py-2 bg-purple-50 rounded-xl">
-                    <span className="text-sm text-gray-700">{d.replace(/-/g, '/')}{t ? `　${t}` : ''}</span>
-                    <button onClick={() => removeSpotDate(d)} className="text-gray-300 hover:text-red-500 transition-colors">
-                      <Trash2 size={15} />
+          {(() => {
+            const now = new Date();
+            const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const nextMonth = `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}`.replace(/-13$/, `${now.getFullYear() + 1}-01`);
+            const all = patient.spotDates || [];
+            const visible = all.filter(s => { const d = s.date || s; return d.slice(0, 7) === thisMonth || d.slice(0, 7) === nextMonth; });
+            const old = all.filter(s => { const d = s.date || s; return d.slice(0, 7) !== thisMonth && d.slice(0, 7) !== nextMonth; });
+            if (all.length === 0) return <p className="text-xs text-gray-400 text-center py-2">予定日が登録されていません</p>;
+            return (
+              <div className="space-y-1.5">
+                {visible.map(s => {
+                  const d = s.date || s; const t = s.time || '';
+                  return (
+                    <div key={d} className="flex items-center justify-between px-3 py-2 bg-purple-50 rounded-xl">
+                      <span className="text-sm text-gray-700">{d.replace(/-/g, '/')}{t ? `　${t}` : ''}</span>
+                      <button onClick={() => removeSpotDate(d)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </div>
+                  );
+                })}
+                {old.length > 0 && (
+                  <>
+                    <button onClick={() => setShowOldSpot(v => !v)}
+                      className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 py-1">
+                      {showOldSpot ? '▲' : '▼'} それ以外（{old.length}件）
                     </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    {showOldSpot && old.map(s => {
+                      const d = s.date || s; const t = s.time || '';
+                      return (
+                        <div key={d} className="flex items-center justify-between px-3 py-2 bg-purple-50 rounded-xl opacity-60">
+                          <span className="text-sm text-gray-700">{d.replace(/-/g, '/')}{t ? `　${t}` : ''}</span>
+                          <button onClick={() => removeSpotDate(d)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
