@@ -26,6 +26,10 @@ export default function PatientDetail() {
   const [newEmergencyNote, setNewEmergencyNote] = useState('');
   const [showOldAbsent, setShowOldAbsent] = useState(false);
   const [showOldSpot, setShowOldSpot] = useState(false);
+  const [newFurikaeDate, setNewFurikaeDate] = useState('');
+  const [newFurikaeTime, setNewFurikaeTime] = useState('');
+  const [newFurikaeFrom, setNewFurikaeFrom] = useState('');
+  const [showOldFurikae, setShowOldFurikae] = useState(false);
   const [newConfirmText, setNewConfirmText] = useState('');
   const [showTerminateForm, setShowTerminateForm] = useState(false);
   const [terminateReason, setTerminateReason] = useState('');
@@ -75,6 +79,35 @@ export default function PatientDetail() {
   const removeAbsentDate = (date) => {
     const updated = patients.map(p =>
       p.id === patient.id ? { ...p, absentDates: (p.absentDates || []).filter(d => d !== date) } : p
+    );
+    savePatients(updated);
+  };
+
+  const addFurikae = () => {
+    if (!newFurikaeDate) return;
+    const entry = { date: newFurikaeDate, time: newFurikaeTime, type: 'furikae', fromDate: newFurikaeFrom };
+    const spotSorted = [...(patient.spotDates || []), entry].sort((a, b) => (a.date || a).localeCompare(b.date || b));
+    let newAbsentDates = patient.absentDates || [];
+    if (newFurikaeFrom && !newAbsentDates.includes(newFurikaeFrom)) {
+      newAbsentDates = [...newAbsentDates, newFurikaeFrom].sort();
+    }
+    const updated = patients.map(p =>
+      p.id === patient.id ? { ...p, spotDates: spotSorted, absentDates: newAbsentDates } : p
+    );
+    savePatients(updated);
+    setNewFurikaeDate(''); setNewFurikaeTime(''); setNewFurikaeFrom('');
+  };
+
+  const removeFurikae = (date) => {
+    const entry = (patient.spotDates || []).find(s => (s.date || s) === date && s.type === 'furikae');
+    let newAbsentDates = patient.absentDates || [];
+    if (entry?.fromDate) {
+      newAbsentDates = newAbsentDates.filter(d => d !== entry.fromDate);
+    }
+    const updated = patients.map(p =>
+      p.id === patient.id
+        ? { ...p, spotDates: (p.spotDates || []).filter(s => !((s.date || s) === date && s.type === 'furikae')), absentDates: newAbsentDates }
+        : p
     );
     savePatients(updated);
   };
@@ -326,6 +359,68 @@ export default function PatientDetail() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* 振替記録 */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-3">
+          <Calendar size={16} className="text-blue-500" />振替
+        </div>
+        <div className="space-y-2 mb-3">
+          <div className="flex gap-2 flex-wrap">
+            <input type="date" value={newFurikaeDate} onChange={e => setNewFurikaeDate(e.target.value)}
+              className="flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="振替日" />
+            <input type="time" value={newFurikaeTime} onChange={e => setNewFurikaeTime(e.target.value)}
+              className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <button onClick={addFurikae}
+              className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+              <Plus size={15} />追加
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 shrink-0">元の訪問日（キャンセル）</span>
+            <input type="date" value={newFurikaeFrom} onChange={e => setNewFurikaeFrom(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+        </div>
+        {(() => {
+          const now = new Date();
+          const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const nextMonth = `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, '0')}`.replace(/-13$/, `${now.getFullYear() + 1}-01`);
+          const all = (patient.spotDates || []).filter(s => s.type === 'furikae');
+          const visible = all.filter(s => s.date.slice(0, 7) === thisMonth || s.date.slice(0, 7) === nextMonth);
+          const old = all.filter(s => s.date.slice(0, 7) !== thisMonth && s.date.slice(0, 7) !== nextMonth);
+          if (all.length === 0) return <p className="text-xs text-gray-400 text-center py-1">登録されていません</p>;
+          return (
+            <div className="space-y-1.5">
+              {visible.map(s => (
+                <div key={s.date} className="flex items-center justify-between px-3 py-2 bg-blue-50 rounded-xl">
+                  <div>
+                    <span className="text-sm font-medium text-blue-700">振替　{s.date.replace(/-/g, '/')}{s.time ? `　${s.time}` : ''}</span>
+                    {s.fromDate && <span className="text-xs text-gray-400 ml-2">← {s.fromDate.replace(/-/g, '/')}から</span>}
+                  </div>
+                  <button onClick={() => removeFurikae(s.date)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {old.length > 0 && (
+                <>
+                  <button onClick={() => setShowOldFurikae(v => !v)} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 py-1">
+                    {showOldFurikae ? '▲' : '▼'} それ以外（{old.length}件）
+                  </button>
+                  {showOldFurikae && old.map(s => (
+                    <div key={s.date} className="flex items-center justify-between px-3 py-2 bg-blue-50 rounded-xl opacity-60">
+                      <div>
+                        <span className="text-sm font-medium text-blue-700">振替　{s.date.replace(/-/g, '/')}{s.time ? `　${s.time}` : ''}</span>
+                        {s.fromDate && <span className="text-xs text-gray-400 ml-2">← {s.fromDate.replace(/-/g, '/')}から</span>}
+                      </div>
+                      <button onClick={() => removeFurikae(s.date)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* 救急搬送記録 */}

@@ -433,6 +433,7 @@ export default function ScheduleView() {
                           const timeKey = `${dateStr}-${p.id}`;
                           const isEditingTime = editingTimeKey === timeKey;
                           const isTrialDate = !p.isTrial && (p.trialDates || []).some(s => (s.date || s) === dateStr);
+                          const isFurikae = (p.spotDates || []).some(s => (s.date || s) === dateStr && s.type === 'furikae');
                           const showTrial = p.isTrial || isTrialDate;
                           const todayStr = toDateStr(today);
                           const consentPending = p.consentObtained === false && !p.isTrial && dateStr >= todayStr;
@@ -450,6 +451,9 @@ export default function ScheduleView() {
                                 <span className={`truncate ${consentPending ? 'text-gray-500' : ''}`}>{p.name}</span>
                                 {consentPending && (
                                   <span className="shrink-0 text-[10px] bg-gray-400 text-white px-1.5 py-0.5 rounded-full font-bold">同意書待ち</span>
+                                )}
+                                {!consentPending && isFurikae && (
+                                  <span className="shrink-0 text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">振替</span>
                                 )}
                                 {!consentPending && showTrial && (
                                   <span className="shrink-0 text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold tracking-wide">体験</span>
