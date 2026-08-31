@@ -33,6 +33,8 @@ export default function FullTimeMonthlyReport() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [noVisit, setNoVisit] = useState(false);
+  const [noVisitReason, setNoVisitReason] = useState('入院のため');
   const [summarizing, setSummarizing] = useState(false);
   const [target, setTarget] = useState('company');
 
@@ -84,6 +86,9 @@ export default function FullTimeMonthlyReport() {
   const nameLabel = p.name.endsWith('様') ? p.name : `${p.name}様`;
 
   const buildText = (data) => {
+    if (noVisit) {
+      return `${nameLabel}\n\n${month}月は${noVisitReason}施術は行いませんでした。`;
+    }
     const s = data || sections;
     return `${nameLabel}\n\n` +
       `『${month}月の体調』\n${s.healthCondition || ''}\n\n` +
@@ -111,6 +116,7 @@ export default function FullTimeMonthlyReport() {
     const report = {
       id: generateId(), patientId: p.id, type: 'ft-monthly',
       year, month, sections, correctedText: corrected,
+      ...(noVisit && { noVisit: true }),
       createdAt: new Date().toISOString(),
     };
     saveReports([...reports, report]);
@@ -210,8 +216,34 @@ export default function FullTimeMonthlyReport() {
         </div>
       </Card>
 
+      {/* 利用なし */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" checked={noVisit} onChange={e => setNoVisit(e.target.checked)}
+            className="w-4 h-4 text-gray-600 rounded" />
+          <span className="text-sm font-medium text-gray-700">この月は利用なし（入院・お休み等）</span>
+        </label>
+        {noVisit && (
+          <div className="mt-3">
+            <p className="text-xs text-gray-500 mb-1">理由</p>
+            <div className="flex gap-2 flex-wrap">
+              {['入院のため', 'お休みのため', 'その他'].map(r => (
+                <button key={r} type="button" onClick={() => setNoVisitReason(r)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                    noVisitReason === r ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                  {r}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2 bg-gray-50 rounded-xl px-3 py-2">
+              出力：{nameLabel}　{month}月は{noVisitReason}施術は行いませんでした。
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* AI報告書生成 */}
-      {(() => {
+      {!noVisit && (() => {
         const monthReports = getMonthReports();
         return (
           <ReportAIGenerator
@@ -226,7 +258,7 @@ export default function FullTimeMonthlyReport() {
         );
       })()}
 
-      <Card title="月次内容">
+      {!noVisit && <Card title="月次内容">
         <button onClick={handleAutoFill} disabled={summarizing}
           className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-colors mb-3 disabled:opacity-60">
           {summarizing ? <><Loader2 size={16} className="animate-spin" />AIがまとめ中...</> : <>日報からAIで自動入力（{year}年{month}月）</>}
@@ -245,13 +277,13 @@ export default function FullTimeMonthlyReport() {
         <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-400 border border-gray-100">
           締め文（固定）：{closing}
         </div>
-      </Card>
+      </Card>}
 
-      <button onClick={handleCorrect} disabled={loading}
+      {!noVisit && <button onClick={handleCorrect} disabled={loading}
         className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white py-3.5 rounded-xl font-semibold hover:bg-purple-700 transition-colors disabled:opacity-60">
         {loading ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
         {loading ? 'AI添削中...' : 'AIで添削する'}
-      </button>
+      </button>}
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{error}</div>}
 

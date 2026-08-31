@@ -66,10 +66,13 @@ export default function PatientList() {
       {/* 月次報告書ステータスサマリー（正社員先のみ） */}
       {tab === 'fullTime' && filtered.length > 0 && (() => {
         const eligible = filtered.filter(p => !p.isTrial);
-        const done = eligible.filter(p => reports.some(r =>
-          r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm
+        const noVisitIds = new Set(eligible.filter(p =>
+          reports.some(r => r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm && r.noVisit)
+        ).map(p => p.id));
+        const total = eligible.filter(p => !noVisitIds.has(p.id)).length;
+        const done = eligible.filter(p => !noVisitIds.has(p.id) && reports.some(r =>
+          r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm && !r.noVisit
         )).length;
-        const total = eligible.length;
         return (
           <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium mb-3 ${
             done === total ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>
@@ -88,12 +91,15 @@ export default function PatientList() {
       ) : (
         <div className="space-y-3">
           {filtered.map(p => {
-            const hasMonthlyReport = reports.some(r =>
+            const monthReport = reports.find(r =>
               r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm
             );
+            const hasMonthlyReport = !!monthReport && !monthReport.noVisit;
+            const isNoVisitMonth = !!monthReport?.noVisit;
             return (
               <PatientCard key={p.id} patient={p}
                 hasMonthlyReport={hasMonthlyReport}
+                isNoVisitMonth={isNoVisitMonth}
                 onClick={() => navigate('patient-detail', { patient: p })} />
             );
           })}
@@ -120,7 +126,7 @@ export default function PatientList() {
   );
 }
 
-function PatientCard({ patient, onClick, terminated, hasMonthlyReport }) {
+function PatientCard({ patient, onClick, terminated, hasMonthlyReport, isNoVisitMonth }) {
   const days = Array.isArray(patient.visitDays)
     ? patient.visitDays.join('・')
     : (patient.visitDays || '');
@@ -164,9 +170,11 @@ function PatientCard({ patient, onClick, terminated, hasMonthlyReport }) {
             {patient.type === 'fullTime' ? '正社員先' : '副業先'}
           </span>
           {patient.type === 'fullTime' && !patient.isTrial && !terminated && (
-            hasMonthlyReport
-              ? <span className="flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 size={12} />月報済</span>
-              : <span className="flex items-center gap-1 text-xs text-orange-500 font-medium"><Clock size={12} />月報未</span>
+            isNoVisitMonth
+              ? <span className="text-xs text-gray-400 font-medium">今月なし</span>
+              : hasMonthlyReport
+                ? <span className="flex items-center gap-1 text-xs text-green-600 font-medium"><CheckCircle2 size={12} />月報済</span>
+                : <span className="flex items-center gap-1 text-xs text-orange-500 font-medium"><Clock size={12} />月報未</span>
           )}
         </div>
       </div>
