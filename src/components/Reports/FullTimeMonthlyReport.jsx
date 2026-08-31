@@ -119,7 +119,8 @@ export default function FullTimeMonthlyReport() {
       ...(noVisit && { noVisit: true }),
       createdAt: new Date().toISOString(),
     };
-    saveReports([...reports, report]);
+    const filtered = reports.filter(r => !(r.patientId === p.id && r.type === 'ft-monthly' && r.year === year && r.month === month));
+    saveReports([...filtered, report]);
     setSaved(true);
   };
 
