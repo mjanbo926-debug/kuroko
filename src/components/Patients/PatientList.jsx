@@ -66,9 +66,10 @@ export default function PatientList() {
       {/* 月次報告書ステータスサマリー（正社員先のみ） */}
       {tab === 'fullTime' && filtered.length > 0 && (() => {
         const eligible = filtered.filter(p => !p.isTrial);
-        const noVisitIds = new Set(eligible.filter(p =>
-          reports.some(r => r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm && r.noVisit)
-        ).map(p => p.id));
+        const isNoVisit = (p) =>
+          (p.hospitalized && p.hospitalizedFrom && !p.hospitalizedUntil) ||
+          reports.some(r => r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm && r.noVisit);
+        const noVisitIds = new Set(eligible.filter(isNoVisit).map(p => p.id));
         const total = eligible.filter(p => !noVisitIds.has(p.id)).length;
         const done = eligible.filter(p => !noVisitIds.has(p.id) && reports.some(r =>
           r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm && !r.noVisit
@@ -94,8 +95,10 @@ export default function PatientList() {
             const monthReport = reports.find(r =>
               r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm
             );
-            const hasMonthlyReport = !!monthReport && !monthReport.noVisit;
-            const isNoVisitMonth = !!monthReport?.noVisit;
+            const isNoVisitMonth =
+              (p.hospitalized && p.hospitalizedFrom && !p.hospitalizedUntil) ||
+              !!monthReport?.noVisit;
+            const hasMonthlyReport = !isNoVisitMonth && !!monthReport;
             return (
               <PatientCard key={p.id} patient={p}
                 hasMonthlyReport={hasMonthlyReport}
