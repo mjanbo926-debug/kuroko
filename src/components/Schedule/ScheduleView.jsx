@@ -467,6 +467,9 @@ export default function ScheduleView() {
                                 {!consentPending && showTrial && (
                                   <span className="shrink-0 text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold tracking-wide">体験</span>
                                 )}
+                                {p.isDaiko && (
+                                  <span className="shrink-0 text-[10px] bg-purple-500 text-white px-1.5 py-0.5 rounded-full font-bold">代行</span>
+                                )}
                                 {(p.confirmItems || []).some(i => !i.done) && (
                                   <span className="shrink-0 w-2 h-2 rounded-full bg-orange-400" title="確認事項あり" />
                                 )}
