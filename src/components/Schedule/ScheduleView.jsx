@@ -956,6 +956,9 @@ function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr, t
               {visitRecord.visited ? '訪問済み' : '未訪問'}
             </span>
           )}
+          {patient.isDaiko && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">代行</span>
+          )}
           {(patient.confirmItems || []).some(i => !i.done) && (
             <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-600">
               ！確認{(patient.confirmItems || []).filter(i => !i.done).length}件

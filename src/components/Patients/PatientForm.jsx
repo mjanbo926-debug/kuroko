@@ -186,6 +186,12 @@ export default function PatientForm() {
           <Field label="開始日">
             <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} className={input()} />
           </Field>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" checked={!!form.isDaiko}
+              onChange={e => set('isDaiko', e.target.checked)}
+              className="w-4 h-4 text-purple-600 rounded" />
+            <span className="text-sm text-gray-700">代行患者（スケジュールに「代行」表示）</span>
+          </label>
           <Field label="終了予定日（期間限定の場合）">
             <input type="date" value={form.endDate || ''} onChange={e => set('endDate', e.target.value)} className={input()} placeholder="未定の場合は空欄" />
           </Field>
