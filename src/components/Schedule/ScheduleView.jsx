@@ -435,9 +435,10 @@ export default function ScheduleView() {
                         dayPatients.map(p => {
                           const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                           const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
+                          const _eTimes = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitTimes) ? p.pendingVisitTimes : p.visitTimes;
                           const time = timeOverride || (p.visitSchedule === 'spot'
                             ? (p.spotDates || []).find(s => (s.date || s) === dateStr)?.time || ''
-                            : p.visitTimes?.[dayLabel] || p.visitTime || '');
+                            : _eTimes?.[dayLabel] || p.visitTime || '');
                           const timeKey = `${dateStr}-${p.id}`;
                           const isEditingTime = editingTimeKey === timeKey;
                           const isTrialDate = !p.isTrial && (p.trialDates || []).some(s => (s.date || s) === dateStr);
@@ -789,9 +790,10 @@ export default function ScheduleView() {
                         const isAdded = !normallyScheduled;
                         const ov = scheduleOverrides[dateStr] || {};
                         const timeOverride = ov.timeOverrides?.[p.id] || '';
+                        const _listETimes = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitTimes) ? p.pendingVisitTimes : p.visitTimes;
                         const defaultTime = p.visitSchedule === 'spot'
                           ? (p.spotDates || []).find(s => (s.date || s) === dateStr)?.time || ''
-                          : p.visitTimes?.[dayLabel] || p.visitTime || '';
+                          : _listETimes?.[dayLabel] || p.visitTime || '';
                         return (
                           <div key={p.id} className="flex items-center gap-2 p-3 bg-green-50 border border-green-100 rounded-xl">
                             <div className="flex-1 min-w-0">
@@ -900,7 +902,10 @@ function PatientChip({ patient, onClick, visitRecord, dark, dayLabel, dateStr, t
   const spotEntry = patient.visitSchedule === 'spot' && dateStr
     ? (patient.spotDates || []).find(s => (s.date || s) === dateStr)
     : null;
-  const time = timeOverride || spotEntry?.time || (dayLabel && patient.visitTimes?.[dayLabel]) || patient.visitTime || '';
+  const effectiveVisitTimes = (patient.pendingFrom && dateStr && dateStr >= patient.pendingFrom && patient.pendingVisitTimes)
+    ? patient.pendingVisitTimes
+    : patient.visitTimes;
+  const time = timeOverride || spotEntry?.time || (dayLabel && effectiveVisitTimes?.[dayLabel]) || patient.visitTime || '';
 
   return (
     <button onClick={onClick}
