@@ -41,13 +41,22 @@ function getPatientsForDate(patients, dateStr, overrides) {
     !(ov.removed || []).includes(p.id)
   );
 
+  // 振替患者：通常患者でこの日に振替spotDateがある
+  const furikaePatients = patients.filter(p =>
+    !p.terminated &&
+    p.visitSchedule !== 'spot' &&
+    (p.spotDates || []).some(s => s.date === dateStr && s.type === 'furikae') &&
+    !afterRemoval.find(n => n.id === p.id) &&
+    !(ov.removed || []).includes(p.id)
+  );
+
   // 手動追加（overrides.added）
   const added = (ov.added || [])
     .map(id => patients.find(p => p.id === id))
     .filter(Boolean)
-    .filter(p => !afterRemoval.find(n => n.id === p.id) && !spotPatients.find(n => n.id === p.id));
+    .filter(p => !afterRemoval.find(n => n.id === p.id) && !spotPatients.find(n => n.id === p.id) && !furikaePatients.find(n => n.id === p.id));
 
-  return [...afterRemoval, ...spotPatients, ...added];
+  return [...afterRemoval, ...spotPatients, ...furikaePatients, ...added];
 }
 
 export default function DailyReport() {
