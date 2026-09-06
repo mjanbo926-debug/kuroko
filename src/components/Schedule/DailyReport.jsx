@@ -26,13 +26,15 @@ function getPatientsForDate(patients, dateStr, overrides) {
   const ov = (overrides || {})[dateStr] || {};
 
   // 通常患者（スポット以外）
-  const normally = patients.filter(p =>
-    !p.terminated &&
-    p.visitSchedule !== 'spot' &&
-    (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel) &&
-    (!p.startDate || dateStr >= p.startDate) &&
-    (!p.endDate || dateStr <= p.endDate)
-  );
+  const normally = patients.filter(p => {
+    if (p.terminated || p.visitSchedule === 'spot') return false;
+    if (p.startDate && dateStr < p.startDate) return false;
+    if (p.endDate && dateStr > p.endDate) return false;
+    const effectiveDays = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitDays?.length)
+      ? p.pendingVisitDays
+      : (Array.isArray(p.visitDays) ? p.visitDays : []);
+    return effectiveDays.includes(dayLabel);
+  });
   const afterRemoval = normally.filter(p => !(ov.removed || []).includes(p.id));
 
   // スポット患者：spotDatesにこの日がある

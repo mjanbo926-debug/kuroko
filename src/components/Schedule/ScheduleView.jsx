@@ -45,7 +45,10 @@ function getEffectivePatients(patients, date, overrides) {
     if (p.startDate && dateStr < p.startDate) return false;
     // 終了予定日が設定されている場合、それより後の日は表示しない
     if (p.endDate && dateStr > p.endDate) return false;
-    return (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel);
+    const effectiveDays = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitDays?.length)
+      ? p.pendingVisitDays
+      : (Array.isArray(p.visitDays) ? p.visitDays : []);
+    return effectiveDays.includes(dayLabel);
   });
   const afterRemoval = normally.filter(p => !(ov.removed || []).includes(p.id));
   const added = (ov.added || [])
@@ -62,7 +65,10 @@ function getEffectivePatients(patients, date, overrides) {
     // 定期患者のspotDate（体験日など）の時刻
     const spotEntry = (p.spotDates || []).find(s => (s.date || s) === dateStr);
     if (spotEntry) return spotEntry.time || '99:99';
-    return p.visitTimes?.[dayLabel] || p.visitTime || '99:99';
+    const effectiveTimes = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitTimes)
+      ? p.pendingVisitTimes
+      : p.visitTimes;
+    return effectiveTimes?.[dayLabel] || p.visitTime || '99:99';
   };
   return [...afterRemoval, ...added].sort((a, b) => getTime(a).localeCompare(getTime(b)));
 }

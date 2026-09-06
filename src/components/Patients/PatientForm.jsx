@@ -39,6 +39,18 @@ export default function PatientForm() {
   const setVisitTime = (day, time) => {
     setForm(f => ({ ...f, visitTimes: { ...(f.visitTimes || {}), [day]: time } }));
   };
+  const togglePendingDay = (day) => {
+    setForm(f => {
+      const days = Array.isArray(f.pendingVisitDays) ? f.pendingVisitDays : [];
+      const newDays = days.includes(day) ? days.filter(d => d !== day) : [...days, day];
+      const newTimes = { ...(f.pendingVisitTimes || {}) };
+      if (!newDays.includes(day)) delete newTimes[day];
+      return { ...f, pendingVisitDays: newDays, pendingVisitTimes: newTimes };
+    });
+  };
+  const setPendingVisitTime = (day, time) => {
+    setForm(f => ({ ...f, pendingVisitTimes: { ...(f.pendingVisitTimes || {}), [day]: time } }));
+  };
 
   const validate = () => {
     const e = {};
@@ -176,6 +188,49 @@ export default function PatientForm() {
           <Field label="終了予定日（期間限定の場合）">
             <input type="date" value={form.endDate || ''} onChange={e => set('endDate', e.target.value)} className={input()} placeholder="未定の場合は空欄" />
           </Field>
+          <div className="pt-1 space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={!!(form.pendingFrom || form.pendingVisitDays?.length)}
+                onChange={e => { if (!e.target.checked) set('pendingFrom', '') && set('pendingVisitDays', []) && set('pendingVisitTimes', {}); }}
+                className="w-4 h-4 text-blue-600 rounded" />
+              <span className="text-sm text-gray-700">曜日変更の予定あり</span>
+            </label>
+            {(form.pendingFrom || form.pendingVisitDays?.length > 0) && (
+              <div className="pl-7 space-y-3">
+                <Field label="変更予定日">
+                  <input type="date" value={form.pendingFrom || ''} onChange={e => set('pendingFrom', e.target.value)} className={input()} />
+                </Field>
+                <Field label="変更後の訪問曜日">
+                  <div className="flex flex-wrap gap-2">
+                    {VISIT_DAYS.map(day => {
+                      const pendingDays = Array.isArray(form.pendingVisitDays) ? form.pendingVisitDays : [];
+                      return (
+                        <button key={day} type="button" onClick={() => togglePendingDay(day)}
+                          className={`w-10 h-10 rounded-full text-sm font-medium transition-colors ${
+                            pendingDays.includes(day) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+                {(Array.isArray(form.pendingVisitDays) ? form.pendingVisitDays : []).length > 0 && (
+                  <Field label="変更後の訪問時刻">
+                    <div className="space-y-2">
+                      {(Array.isArray(form.pendingVisitDays) ? form.pendingVisitDays : []).map(day => (
+                        <div key={day} className="flex items-center gap-3">
+                          <span className="w-6 text-sm font-medium text-gray-600 shrink-0">{day}</span>
+                          <input type="time" value={(form.pendingVisitTimes || {})[day] || ''}
+                            onChange={e => setPendingVisitTime(day, e.target.value)}
+                            className={input() + ' flex-1'} />
+                        </div>
+                      ))}
+                    </div>
+                  </Field>
+                )}
+              </div>
+            )}
+          </div>
           <Field label="注意事項（担当PTからの指示など）">
             <textarea value={form.cautions} onChange={e => set('cautions', e.target.value)}
               className={textarea()} rows={3} placeholder="注意事項・禁忌など..." />
