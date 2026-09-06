@@ -24,6 +24,7 @@ export default function PatientForm() {
 
   const [form, setForm] = useState(init);
   const [errors, setErrors] = useState({});
+  const [showPending, setShowPending] = useState(!!(init.pendingFrom || init.pendingVisitDays?.length));
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
   const setAdl = (key, val) => setForm(f => ({ ...f, adl: { ...f.adl, [key]: val } }));
@@ -190,12 +191,15 @@ export default function PatientForm() {
           </Field>
           <div className="pt-1 space-y-2">
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={!!(form.pendingFrom || form.pendingVisitDays?.length)}
-                onChange={e => { if (!e.target.checked) set('pendingFrom', '') && set('pendingVisitDays', []) && set('pendingVisitTimes', {}); }}
+              <input type="checkbox" checked={showPending}
+                onChange={e => {
+                  setShowPending(e.target.checked);
+                  if (!e.target.checked) setForm(f => ({ ...f, pendingFrom: '', pendingVisitDays: [], pendingVisitTimes: {} }));
+                }}
                 className="w-4 h-4 text-blue-600 rounded" />
               <span className="text-sm text-gray-700">曜日変更の予定あり</span>
             </label>
-            {(form.pendingFrom || form.pendingVisitDays?.length > 0) && (
+            {showPending && (
               <div className="pl-7 space-y-3">
                 <Field label="変更予定日">
                   <input type="date" value={form.pendingFrom || ''} onChange={e => set('pendingFrom', e.target.value)} className={input()} />
