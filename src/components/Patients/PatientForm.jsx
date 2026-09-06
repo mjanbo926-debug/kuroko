@@ -173,6 +173,9 @@ export default function PatientForm() {
           <Field label="開始日">
             <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} className={input()} />
           </Field>
+          <Field label="終了予定日（期間限定の場合）">
+            <input type="date" value={form.endDate || ''} onChange={e => set('endDate', e.target.value)} className={input()} placeholder="未定の場合は空欄" />
+          </Field>
           <Field label="注意事項（担当PTからの指示など）">
             <textarea value={form.cautions} onChange={e => set('cautions', e.target.value)}
               className={textarea()} rows={3} placeholder="注意事項・禁忌など..." />

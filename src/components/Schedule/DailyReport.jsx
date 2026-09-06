@@ -30,7 +30,8 @@ function getPatientsForDate(patients, dateStr, overrides) {
     !p.terminated &&
     p.visitSchedule !== 'spot' &&
     (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel) &&
-    (!p.startDate || dateStr >= p.startDate)
+    (!p.startDate || dateStr >= p.startDate) &&
+    (!p.endDate || dateStr <= p.endDate)
   );
   const afterRemoval = normally.filter(p => !(ov.removed || []).includes(p.id));
 

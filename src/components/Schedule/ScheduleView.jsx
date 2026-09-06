@@ -43,6 +43,8 @@ function getEffectivePatients(patients, date, overrides) {
     if ((p.trialDates || []).some(s => (s.date || s) === dateStr)) return true;
     // 開始日が設定されている場合、それより前の日は表示しない
     if (p.startDate && dateStr < p.startDate) return false;
+    // 終了予定日が設定されている場合、それより後の日は表示しない
+    if (p.endDate && dateStr > p.endDate) return false;
     return (Array.isArray(p.visitDays) ? p.visitDays : []).includes(dayLabel);
   });
   const afterRemoval = normally.filter(p => !(ov.removed || []).includes(p.id));
