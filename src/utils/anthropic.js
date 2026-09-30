@@ -319,19 +319,40 @@ export async function streamGenerateReport({ patientName, period, dailyReportLis
     }
   }
 
-  // 救急搬送情報の組み立て
+  // 救急搬送情報の組み立て（対象月のもののみ含める）
   const emergencyNote = (() => {
     if (!emergencyTransports?.length) return '';
-    const lines = emergencyTransports
-      .map(e => `・${e.date.replace(/-/g, '/')}　${e.note || ''}`)
-      .join('\n');
+    let filtered = emergencyTransports;
+    if (reportType === 'monthly') {
+      const m = period.match(/(\d{4})年(\d{1,2})月/);
+      if (m) {
+        const y = m[1], mo = String(m[2]).padStart(2, '0');
+        const monthStart = `${y}-${mo}-01`;
+        const monthEnd = `${y}-${mo}-31`;
+        filtered = emergencyTransports.filter(e => e.date >= monthStart && e.date <= monthEnd);
+      }
+    }
+    if (!filtered.length) return '';
+    const lines = filtered.map(e => `・${e.date.replace(/-/g, '/')}　${e.note || ''}`).join('\n');
     const hasHospitalization = !!hospitalizedFrom;
     return `\n\n【救急搬送記録】\n${lines}\n※搬送の事実は報告書に必ず明記すること。${hasHospitalization ? '' : '搬送後に入院したか帰宅したか現時点では不明なため、「救急搬送された」という事実のみを記載し、その後の状況については断定しないこと。'}`;
   })();
 
-  // 入院情報の組み立て
+  // 入院情報の組み立て（対象月と重なる場合のみ含める）
   const hospitalizationNote = (() => {
     if (!hospitalizedFrom) return '';
+    // 月次報告書の場合は対象期間と入院期間が重なるか確認
+    if (reportType === 'monthly') {
+      const m = period.match(/(\d{4})年(\d{1,2})月/);
+      if (m) {
+        const y = m[1], mo = String(m[2]).padStart(2, '0');
+        const monthStart = `${y}-${mo}-01`;
+        const monthEnd = `${y}-${mo}-31`;
+        // 入院が対象月より後に始まる、または退院が対象月より前なら含めない
+        if (hospitalizedFrom > monthEnd) return '';
+        if (hospitalizedUntil && hospitalizedUntil < monthStart) return '';
+      }
+    }
     const fromFmt = hospitalizedFrom.replace(/-/g, '/');
     if (hospitalizedUntil) {
       const untilFmt = hospitalizedUntil.replace(/-/g, '/');
