@@ -200,13 +200,21 @@ export default function FullTimeMonthlyReport() {
       <Card title="対象月">
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <select value={year} onChange={e => setYear(Number(e.target.value))} className={inp()}>
+            <select value={year} onChange={e => {
+              setYear(Number(e.target.value));
+              setSections({ healthCondition: '', physicalCondition: '', treatmentContent: p.treatmentTemplate || '', lifeObservations: '' });
+              setCorrected(''); setSaved(false); setNoVisit(false);
+            }} className={inp()}>
               {[cy - 1, cy, cy + 1].map(y => <option key={y}>{y}</option>)}
             </select>
           </div>
           <span className="text-gray-500">年</span>
           <div className="flex-1">
-            <select value={month} onChange={e => setMonth(Number(e.target.value))} className={inp()}>
+            <select value={month} onChange={e => {
+              setMonth(Number(e.target.value));
+              setSections({ healthCondition: '', physicalCondition: '', treatmentContent: p.treatmentTemplate || '', lifeObservations: '' });
+              setCorrected(''); setSaved(false); setNoVisit(false);
+            }} className={inp()}>
               {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
