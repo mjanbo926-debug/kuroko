@@ -91,7 +91,7 @@ export default function Settings() {
         if (data.dailyReports) { saveDailyReports(data.dailyReports); counts['スケジュール日報'] = data.dailyReports.length; }
         if (data.patientDailyReports) { savePatientDailyReports(data.patientDailyReports); counts['施術日報'] = data.patientDailyReports.length; }
         if (data.scheduleOverrides) { saveScheduleOverrides(data.scheduleOverrides); }
-        if (data._holidays) { saveSettings({ ...settings, holidays: data._holidays }); }
+        if (data._holidays?.length > 0) { saveSettings({ ...settings, holidays: data._holidays }); }
 
         const summary = Object.entries(counts).map(([k, v]) => `${k}${v}件`).join('、');
         setImportStatus('success');
