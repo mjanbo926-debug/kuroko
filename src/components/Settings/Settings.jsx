@@ -59,6 +59,7 @@ export default function Settings() {
   const handleExport = () => {
     const data = {};
     DATA_KEYS.forEach(key => { data[key] = storage.get(key, key.endsWith('s') ? [] : {}); });
+    data._holidays = settings.holidays || [];
     data._exportedAt = new Date().toISOString();
     data._version = 1;
 
@@ -90,6 +91,7 @@ export default function Settings() {
         if (data.dailyReports) { saveDailyReports(data.dailyReports); counts['スケジュール日報'] = data.dailyReports.length; }
         if (data.patientDailyReports) { savePatientDailyReports(data.patientDailyReports); counts['施術日報'] = data.patientDailyReports.length; }
         if (data.scheduleOverrides) { saveScheduleOverrides(data.scheduleOverrides); }
+        if (data._holidays) { saveSettings({ ...settings, holidays: data._holidays }); }
 
         const summary = Object.entries(counts).map(([k, v]) => `${k}${v}件`).join('、');
         setImportStatus('success');
@@ -111,6 +113,7 @@ export default function Settings() {
   const handleBackup = () => {
     const data = {};
     DATA_KEYS.forEach(key => { data[key] = storage.get(key, key.endsWith('s') ? [] : {}); });
+    data._holidays = settings.holidays || [];
     data._exportedAt = new Date().toISOString();
     data._version = 1;
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
