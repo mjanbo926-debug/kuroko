@@ -400,7 +400,7 @@ export default function ScheduleView() {
                 const paidLeave = scheduleOverrides[dateStr]?.paidLeave;
                 const removedPatients = (paidLeave?.type === 'time')
                   ? (scheduleOverrides[dateStr]?.removed || [])
-                      .map(id => filteredPatients.find(p => p.id === id))
+                      .map(id => patients.find(p => p.id === id))
                       .filter(Boolean)
                   : [];
                 const activeCount = holidayName ? 0 : dayPatients.filter(p =>
