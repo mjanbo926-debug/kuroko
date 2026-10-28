@@ -142,8 +142,9 @@ export default function ScheduleView() {
       }
     }
 
-    // 上書きが空になったら削除
-    const isEmpty = !(ov.added?.length) && !(ov.removed?.length);
+    // 上書きが空になったら削除（paidLeaveがあれば保持）
+    const isEmpty = !(ov.added?.length) && !(ov.removed?.length) &&
+      !ov.paidLeave && !Object.keys(ov.absences || {}).length && !Object.keys(ov.timeOverrides || {}).length;
     const newOverrides = { ...scheduleOverrides };
     if (isEmpty) delete newOverrides[dateStr];
     else newOverrides[dateStr] = ov;
@@ -398,24 +399,12 @@ export default function ScheduleView() {
                 const holidayName = getHolidayName(dateStr);
                 const dayPatients = getEffectivePatients(filteredPatients, date, scheduleOverrides);
                 const paidLeave = scheduleOverrides[dateStr]?.paidLeave;
-                // 時間指定有給の日：本来スケジュールにいるが外されている患者をお休み表示
-                const removedPatients = (() => {
-                  if (paidLeave?.type !== 'time') return [];
-                  const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
-                  const ov = scheduleOverrides[dateStr] || {};
-                  return filteredPatients.filter(p => {
-                    if (p.terminated) return false;
-                    if (p.visitSchedule === 'spot') return false;
-                    if (p.startDate && dateStr < p.startDate) return false;
-                    if (p.endDate && dateStr > p.endDate) return false;
-                    const effectiveDays = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitDays?.length)
-                      ? p.pendingVisitDays : (Array.isArray(p.visitDays) ? p.visitDays : []);
-                    if (!effectiveDays.includes(dayLabel)) return false;
-                    // dayPatients に含まれていない（外されている）患者
-                    if (dayPatients.find(dp => dp.id === p.id)) return false;
-                    return true;
-                  });
-                })();
+                // 時間指定有給の日：外した患者（ov.removed）をお休み（有給）で表示
+                const removedPatients = (paidLeave?.type === 'time')
+                  ? (scheduleOverrides[dateStr]?.removed || [])
+                      .map(id => patients.find(p => p.id === id))
+                      .filter(Boolean)
+                  : [];
                 const activeCount = holidayName ? 0 : dayPatients.filter(p =>
                   !p.status &&
                   !isPatientHospitalized(p, dateStr) &&
