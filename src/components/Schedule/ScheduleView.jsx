@@ -528,12 +528,20 @@ export default function ScheduleView() {
                             </div>
                           );
                         })}
-                        {removedPatients.map(p => (
-                          <div key={`removed-${p.id}`} className="w-full px-2 py-1.5 rounded-lg bg-gray-50 border border-dashed border-gray-200 opacity-60">
-                            <div className="text-xs font-semibold text-gray-400 truncate">{p.name}</div>
-                            <div className="text-xs text-gray-400">外した</div>
-                          </div>
-                        ))}
+                        {removedPatients.map(p => {
+                          const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
+                          const _eTimes = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitTimes) ? p.pendingVisitTimes : p.visitTimes;
+                          const time = p.visitSchedule === 'spot'
+                            ? (p.spotDates || []).find(s => (s.date || s) === dateStr)?.time || ''
+                            : _eTimes?.[dayLabel] || p.visitTime || '';
+                          return (
+                            <div key={`removed-${p.id}`} className={`w-full px-2 py-1.5 rounded-lg bg-white border border-gray-100`}>
+                              <div className="text-xs font-semibold text-gray-800 truncate">{p.name}</div>
+                              {time && <div className="text-xs text-gray-400 mt-0.5">{time}</div>}
+                              <div className="text-xs font-medium text-orange-500">お休み（有給）</div>
+                            </div>
+                          );
+                        })}
                         </>
                       )}
                     </div>
