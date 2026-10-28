@@ -24,6 +24,7 @@ export default function PatientList() {
   );
   const ftCount = activePatients.filter(p => p.type === 'fullTime').length;
   const ptCount = activePatients.filter(p => p.type === 'partTime').length;
+  const todayStr = now.toISOString().split('T')[0];
 
   return (
     <div>
@@ -68,6 +69,7 @@ export default function PatientList() {
         const eligible = filtered.filter(p => !p.isTrial);
         const isNoVisit = (p) =>
           (p.hospitalized && p.hospitalizedFrom && !p.hospitalizedUntil) ||
+          (p.paused && p.pausedFrom && !p.pausedUntil) ||
           reports.some(r => r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm && r.noVisit);
         const noVisitIds = new Set(eligible.filter(isNoVisit).map(p => p.id));
         const total = eligible.filter(p => !noVisitIds.has(p.id)).length;
@@ -95,14 +97,18 @@ export default function PatientList() {
             const monthReport = reports.find(r =>
               r.patientId === p.id && r.type === 'ft-monthly' && r.year === cy && r.month === cm
             );
+            const pauseStarted = p.paused && p.pausedFrom && p.pausedFrom <= todayStr && !p.pausedUntil;
+            const pauseScheduled = p.paused && p.pausedFrom && p.pausedFrom > todayStr;
             const isNoVisitMonth =
               (p.hospitalized && p.hospitalizedFrom && !p.hospitalizedUntil) ||
+              pauseStarted ||
               !!monthReport?.noVisit;
             const hasMonthlyReport = !isNoVisitMonth && !!monthReport;
             return (
               <PatientCard key={p.id} patient={p}
                 hasMonthlyReport={hasMonthlyReport}
                 isNoVisitMonth={isNoVisitMonth}
+                pauseScheduled={pauseScheduled ? p.pausedFrom : null}
                 onClick={() => navigate('patient-detail', { patient: p })} />
             );
           })}
@@ -129,7 +135,7 @@ export default function PatientList() {
   );
 }
 
-function PatientCard({ patient, onClick, terminated, hasMonthlyReport, isNoVisitMonth }) {
+function PatientCard({ patient, onClick, terminated, hasMonthlyReport, isNoVisitMonth, pauseScheduled }) {
   const days = Array.isArray(patient.visitDays)
     ? patient.visitDays.join('・')
     : (patient.visitDays || '');
@@ -172,6 +178,11 @@ function PatientCard({ patient, onClick, terminated, hasMonthlyReport, isNoVisit
             patient.type === 'fullTime' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
             {patient.type === 'fullTime' ? '正社員先' : '副業先'}
           </span>
+          {patient.paused && !patient.pausedUntil && !terminated && (
+            pauseScheduled
+              ? <span className="text-xs text-yellow-600 font-medium">{pauseScheduled.replace(/-/g, '/').slice(5)}〜休止予定</span>
+              : <span className="text-xs text-yellow-600 font-medium">休止中{patient.pausedReason ? `・${patient.pausedReason}` : ''}</span>
+          )}
           {patient.type === 'fullTime' && !patient.isTrial && !terminated && (
             isNoVisitMonth
               ? <span className="text-xs text-gray-400 font-medium">今月なし</span>

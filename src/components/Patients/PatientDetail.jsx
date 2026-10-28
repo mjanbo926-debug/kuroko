@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../App';
-import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2, XCircle, AlertTriangle, ClipboardList, CheckSquare, Square, ClipboardPen } from 'lucide-react';
+import { Edit, FileText, Clock, ChevronRight, ChevronDown, ChevronUp, MapPin, Calendar, AlertCircle, User, NotebookPen, BedDouble, Plus, Trash2, XCircle, AlertTriangle, ClipboardList, CheckSquare, Square, ClipboardPen, PauseCircle } from 'lucide-react';
 import { formatDate, REPORT_LABELS, generateId } from '../../utils/helpers';
 
 const ADL_LABELS = [
@@ -315,6 +315,9 @@ export default function PatientDetail() {
           </button>
         </div>
       )}
+
+      {/* 一時休止管理 */}
+      <PausePanel patient={patient} patients={patients} savePatients={savePatients} />
 
       {/* 入院管理 */}
       <HospitalizationPanel patient={patient} patients={patients} savePatients={savePatients} />
@@ -962,6 +965,80 @@ function HospitalizationPanel({ patient, patients, savePatients }) {
           </div>
           {untilDate && (
             <p className="text-xs text-green-600 font-medium pt-1">{untilDate.replace(/-/g, '/')}より施術再開</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PausePanel({ patient, patients, savePatients }) {
+  const [fromDate, setFromDate] = useState(patient.pausedFrom || '');
+  const [untilDate, setUntilDate] = useState(patient.pausedUntil || '');
+  const [reason, setReason] = useState(patient.pausedReason || '');
+
+  const save = (paused, from, until, rsn) => {
+    const updated = patients.map(p =>
+      p.id !== patient.id ? p : {
+        ...p,
+        paused,
+        pausedFrom: from || undefined,
+        pausedUntil: until || undefined,
+        pausedReason: rsn || undefined,
+      }
+    );
+    savePatients(updated);
+  };
+
+  const isPaused = !!patient.paused;
+
+  return (
+    <div className={`rounded-2xl shadow-sm border p-4 ${isPaused ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-100'}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600">
+          <PauseCircle size={16} className={isPaused ? 'text-yellow-500' : 'text-gray-400'} />
+          一時休止管理
+          {isPaused && <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded-full font-bold">休止中</span>}
+        </div>
+        {isPaused ? (
+          <button
+            onClick={() => { save(false, '', '', ''); setFromDate(''); setUntilDate(''); setReason(''); }}
+            className="text-xs text-gray-400 hover:text-yellow-600 transition-colors">解除</button>
+        ) : (
+          <button
+            onClick={() => { const today = new Date().toISOString().split('T')[0]; save(true, today, '', reason); setFromDate(today); }}
+            className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-lg font-medium hover:bg-yellow-200 transition-colors">
+            一時休止を記録する
+          </button>
+        )}
+      </div>
+      {isPaused && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-20 shrink-0">休止開始日</span>
+            <input type="date" value={fromDate}
+              onChange={e => { setFromDate(e.target.value); save(true, e.target.value, untilDate, reason); }}
+              className="flex-1 px-3 py-2 border border-yellow-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-300" />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-20 shrink-0">施術再開日</span>
+            <input type="date" value={untilDate}
+              onChange={e => { setUntilDate(e.target.value); save(true, fromDate, e.target.value, reason); }}
+              placeholder="未定の場合は空欄"
+              className="flex-1 px-3 py-2 border border-yellow-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-300" />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 w-20 shrink-0">休止理由</span>
+            <input type="text" value={reason}
+              onChange={e => { setReason(e.target.value); save(true, fromDate, untilDate, e.target.value); }}
+              placeholder="例：病院リハビリ通院のため"
+              className="flex-1 px-3 py-2 border border-yellow-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-300" />
+          </div>
+          {untilDate && (
+            <p className="text-xs text-green-600 font-medium pt-1">{untilDate.replace(/-/g, '/')}より施術再開</p>
+          )}
+          {!untilDate && patient.pausedReason && (
+            <p className="text-xs text-yellow-700 pt-1">{patient.pausedReason}</p>
           )}
         </div>
       )}

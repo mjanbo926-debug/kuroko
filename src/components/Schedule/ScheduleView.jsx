@@ -88,6 +88,14 @@ export default function ScheduleView() {
     if (p.hospitalizedUntil && dateStr >= p.hospitalizedUntil) return false;
     return true;
   };
+
+  // 指定日に一時休止中かどうかチェック
+  const isPatientPaused = (p, dateStr) => {
+    if (!p.paused || !p.pausedFrom) return false;
+    if (dateStr < p.pausedFrom) return false;
+    if (p.pausedUntil && dateStr >= p.pausedUntil) return false;
+    return true;
+  };
   const [weekOffset, setWeekOffset] = useState(0);
   const [filter, setFilter] = useState('all');
   const [editingDate, setEditingDate] = useState(null);
@@ -392,6 +400,7 @@ export default function ScheduleView() {
                 const activeCount = holidayName ? 0 : dayPatients.filter(p =>
                   !p.status &&
                   !isPatientHospitalized(p, dateStr) &&
+                  !isPatientPaused(p, dateStr) &&
                   !(p.consentObtained === false && !p.isTrial && dateStr >= toDateStr(today)) &&
                   !(p.absentDates || []).includes(dateStr) &&
                   !(scheduleOverrides[dateStr] || {}).absences?.[p.id] &&
@@ -492,6 +501,8 @@ export default function ScheduleView() {
                               )}
                               {isPatientHospitalized(p, dateStr) ? (
                                 <div className="text-xs font-medium text-red-500">入院中</div>
+                              ) : isPatientPaused(p, dateStr) ? (
+                                <div className="text-xs font-medium text-yellow-600">一時休止中</div>
                               ) : p.status ? (
                                 <div className={`text-xs font-medium ${p.status === 'hospitalized' ? 'text-red-500' : 'text-gray-500'}`}>
                                   {p.status === 'hospitalized' ? '入院中' : p.statusNote || 'その他'}
@@ -550,6 +561,7 @@ export default function ScheduleView() {
         const todayActiveCount = todayPatients.filter(p =>
           !p.status &&
           !isPatientHospitalized(p, todayDateStr) &&
+          !isPatientPaused(p, todayDateStr) &&
           !(p.consentObtained === false && !p.isTrial) &&
           !(p.absentDates || []).includes(todayDateStr) &&
           !(scheduleOverrides[todayDateStr] || {}).absences?.[p.id] &&
@@ -591,6 +603,7 @@ export default function ScheduleView() {
           const listActiveCount = holidayNameList ? 0 : dayPatients.filter(p =>
             !p.status &&
             !isPatientHospitalized(p, dateStr) &&
+            !isPatientPaused(p, dateStr) &&
             !(p.consentObtained === false && !p.isTrial && dateStr >= toDateStr(today)) &&
             !(p.absentDates || []).includes(dateStr) &&
             !(scheduleOverrides[dateStr] || {}).absences?.[p.id] &&
@@ -678,8 +691,9 @@ export default function ScheduleView() {
                       const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                       const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
                       const hospitalizedNow = isPatientHospitalized(p, dateStr);
-                      const absenceReason = hospitalizedNow ? '入院中' : holidayNameList || (scheduleOverrides[dateStr] || {}).absences?.[p.id];
-                      const isAbsenceTarget = !holidayNameList && !hospitalizedNow && absenceTarget?.patientId === p.id && absenceTarget?.dateStr === dateStr;
+                      const pausedNow = isPatientPaused(p, dateStr);
+                      const absenceReason = hospitalizedNow ? '入院中' : pausedNow ? '一時休止中' : holidayNameList || (scheduleOverrides[dateStr] || {}).absences?.[p.id];
+                      const isAbsenceTarget = !holidayNameList && !hospitalizedNow && !pausedNow && absenceTarget?.patientId === p.id && absenceTarget?.dateStr === dateStr;
                       return (
                         <div key={p.id} className="space-y-1.5">
                           <div className="flex items-center gap-2">
@@ -688,7 +702,7 @@ export default function ScheduleView() {
                                 timeOverride={timeOverride} absenceReason={absenceReason}
                                 onClick={() => navigate('patient-detail', { patient: p })} />
                             </div>
-                            {!holidayNameList && !hospitalizedNow && (
+                            {!holidayNameList && !hospitalizedNow && !pausedNow && (
                               <button
                                 onClick={() => setAbsenceTarget(isAbsenceTarget ? null : { patientId: p.id, dateStr })}
                                 className={`shrink-0 flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
