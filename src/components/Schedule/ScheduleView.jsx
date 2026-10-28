@@ -403,7 +403,7 @@ export default function ScheduleView() {
                   if (paidLeave?.type !== 'time') return [];
                   const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                   const ov = scheduleOverrides[dateStr] || {};
-                  return patients.filter(p => {
+                  return filteredPatients.filter(p => {
                     if (p.terminated) return false;
                     if (p.visitSchedule === 'spot') return false;
                     if (p.startDate && dateStr < p.startDate) return false;
