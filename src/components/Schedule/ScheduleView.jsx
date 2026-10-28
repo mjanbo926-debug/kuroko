@@ -397,6 +397,12 @@ export default function ScheduleView() {
                 const isHoliday = isJapaneseHoliday(dateStr);
                 const holidayName = getHolidayName(dateStr);
                 const dayPatients = getEffectivePatients(filteredPatients, date, scheduleOverrides);
+                const paidLeave = scheduleOverrides[dateStr]?.paidLeave;
+                const removedPatients = (paidLeave?.type === 'time')
+                  ? (scheduleOverrides[dateStr]?.removed || [])
+                      .map(id => filteredPatients.find(p => p.id === id))
+                      .filter(Boolean)
+                  : [];
                 const activeCount = holidayName ? 0 : dayPatients.filter(p =>
                   !p.status &&
                   !isPatientHospitalized(p, dateStr) &&
@@ -436,12 +442,13 @@ export default function ScheduleView() {
                     </div>
                     {/* 患者リスト */}
                     <div className="flex flex-col gap-1 p-1.5 min-h-16">
-                      {dayPatients.length === 0 ? (
+                      {dayPatients.length === 0 && removedPatients.length === 0 ? (
                         <div className="flex items-center justify-center h-10">
                           <span className="text-xs text-gray-300">なし</span>
                         </div>
                       ) : (
-                        dayPatients.map(p => {
+                        <>
+                        {dayPatients.map(p => {
                           const dayLabel = DAYS[JS_DAY_TO_IDX[date.getDay()]];
                           const timeOverride = (scheduleOverrides[dateStr] || {}).timeOverrides?.[p.id];
                           const _eTimes = (p.pendingFrom && dateStr >= p.pendingFrom && p.pendingVisitTimes) ? p.pendingVisitTimes : p.visitTimes;
@@ -520,7 +527,14 @@ export default function ScheduleView() {
                               })()}
                             </div>
                           );
-                        })
+                        })}
+                        {removedPatients.map(p => (
+                          <div key={`removed-${p.id}`} className="w-full px-2 py-1.5 rounded-lg bg-gray-50 border border-dashed border-gray-200 opacity-60">
+                            <div className="text-xs font-semibold text-gray-400 truncate">{p.name}</div>
+                            <div className="text-xs text-gray-400">外した</div>
+                          </div>
+                        ))}
+                        </>
                       )}
                     </div>
                     {/* 日報ボタン */}
